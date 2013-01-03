@@ -1,0 +1,56 @@
+' Gambas module file
+
+' Gambas module file
+
+'/ * *
+'*
+'* @ package mFuncionesPantalla.module
+'* @ copyright 2009 2010 Luis Jorge Martin Aznar
+'* @ version 1.0
+'* @ review 2 
+'* @ author Luis Jorge Martin Aznar 
+'* @ e-mail ljma@telefonica.net
+'* creacion = 01/06/2010
+'* modificacion = 01/03/2011
+'*
+'* This file IS part OF TPV-ERP ©.
+'*
+'* This program IS free software: you can redistribute it AND / OR modify
+'* it under the terms OF the GNU General PUBLIC License AS published by
+'* the Free Software Foundation, either version 3 OF the License.
+'*
+'* This program IS distributed IN the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty OF
+'* MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.See the
+'* GNU General PUBLIC License FOR more details.
+'*
+'* You should have received a COPY OF the GNU General PUBLIC License
+'* along WITH this program.IfNOT, see < http: / / www.gnu.org / licenses / > .  
+'* /
+'
+'
+
+Public Sub dimensiona_pantalla(formulario As Form, porcenx As Float, porceny As Float)
+    formulario.Width = Desktop.Width * porcenx
+    formulario.Height = Desktop.Height * porceny
+    formulario.Center
+End
+
+
+Public Sub centra_vertical(contenedor As Object, contenido As Object, iFilas As Integer, iFila As Integer, fH As Float) As Float
+  Dim fHfila As Float
+    If iFilas >= iFila Then
+        fHfila = (contenedor.Height / (iFilas))
+       contenido.top = (fHfila * (iFila - 1))
+       contenido.Height = fH
+       contenido.Left = (contenedor.Width - contenido.Width) / 2
+    Endif
+End
+
+'Public Sub centra_teclado(formulario As Form, teclado As CTeclado)
+ '   teclado.Width = formulario.Width * 0.8
+  '  teclado.Height = formulario.Height * 0.8
+   ' teclado.Y = (formulario.Height * 0.2) / 2 + 10
+    'teclado.X = (formulario.Width * 0.2) / 2
+'End
+

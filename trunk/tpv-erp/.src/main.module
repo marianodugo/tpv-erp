@@ -1,0 +1,92 @@
+' Gambas module file
+
+'/ * *
+'*
+'* @ package Main.module
+'* @ copyright 2009 2013 Luis Jorge Martin Aznar
+'* @ version 1.0
+'* @ review 1 
+'* @ author Luis Jorge Martin Aznar 
+'* @ e-mail ljma@telefonica.net
+'* creacion = 01/06/2010
+'* modificacion = 01/01/2013
+'*
+'* This file IS part OF TPV-ERP ©.
+'*
+'* This program IS free software: you can redistribute it AND / OR modify
+'* it under the terms OF the GNU General PUBLIC License AS published by
+'* the Free Software Foundation, either version 3 OF the License.
+'*
+'* This program IS distributed IN the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty OF
+'* MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.See the
+'* GNU General PUBLIC License FOR more details.
+'*
+'* You should have received a COPY OF the GNU General PUBLIC License
+'* along WITH this program.IfNOT, see < http: / / www.gnu.org / licenses / > .  
+'* /
+
+Public bd As CPostgres
+
+
+
+
+Public Sub Main()
+
+Dim sArray As String[]
+  sArray = mFuncionesEncriptar.Lee_ini("TPV-ERP.ini")
+  If sArray.Count > 1 Then  'Sabemos que ha leido bien el ini
+           'inglés GB y español España "en_GB.UTF-8" "es_ES.UTF-8"
+          If sArray[7] <> "" Then
+              System.Language = sArray[7]
+          Endif
+          mVarglobales.sBaseMadre = sArray[2]
+          mVarglobales.sPrefijo = sArray[5]
+          mVarglobales.sBd_hecha = sArray[6]
+          mVarglobales.sNterminal = sArray[8]
+          mVarglobales.sPrefijoTerminal = sArray[5]
+          
+          If mVarglobales.sBd_hecha = "YES" Then  'Nos aseguramos un poco más
+                    bd = New CPostgres(sArray)
+                    Select Case 1 ' Flogin.ShowDialog()
+                    Case 1
+                      '  FPrincipal.ShowModal
+                    Case 2
+                        carga_empresa()       'No hay empresa seleccionada
+                    Case 0
+                        Quit                  'Para cerrar la aplicación
+                    End Select
+          Else
+                    crear_basedatos()
+          Endif
+
+  Else
+          crear_basedatos()
+  Endif
+
+End
+
+
+Private Sub crear_basedatos()
+  If Message.Question(mConstantes.inf_crearbase, mConstantes.inf_si, mConstantes.inf_no) = 1 Then
+     If Message.Question(mConstantes.inf_borrarbase, mConstantes.inf_si, mConstantes.inf_no) = 1 Then
+           FCrearbase.ShowModal
+     Else
+            Quit
+     Endif
+  Else
+      Quit
+  Endif
+End
+
+
+Private Sub carga_empresa()
+'  Dim empresanew As New CEmpresas
+'  empresanew.visualiza(Flogin)
+'  If FPrincipal.bd1 = Null Then  ' Si no hay empresa seleccionada sale del programa
+'    Quit
+'  Endif 
+'  FPrincipal.ShowModal ' Si hay entramos en la pantalla principal
+End
+
+

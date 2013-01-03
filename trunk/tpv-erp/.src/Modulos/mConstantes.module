@@ -1,0 +1,226 @@
+' Gambas module file
+
+'/ * *
+'*
+'* @ package mConstantes.module
+'* @ copyright 2009 2010 Luis Jorge Martin Aznar
+'* @ version 1.0
+'* @ review 1 
+'* @ author Luis Jorge Martin Aznar 
+'* @ e-mail ljma@telefonica.net
+'* creacion = 01/06/2010
+'* modificacion = 01/03/2011
+'*
+'* This file IS part OF TPV-ERP ©.
+'*
+'* This program IS free software: you can redistribute it AND / OR modify
+'* it under the terms OF the GNU General PUBLIC License AS published by
+'* the Free Software Foundation, either version 3 OF the License.
+'*
+'* This program IS distributed IN the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty OF
+'* MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.See the
+'* GNU General PUBLIC License FOR more details.
+'*
+'* You should have received a COPY OF the GNU General PUBLIC License
+'* along WITH this program.IfNOT, see < http: / / www.gnu.org / licenses / > .  
+'* /
+
+ Public Const nversion As String = "1.1.0"
+ Public Const version As String = (" Versión ")
+ Public Const programa As String = "TPV-ERP"
+ Public Const iconotux As String = "/usr/local/TPV-ERP/img/tux_currito.ico"
+ Public Const labora As String = ("Trabajando en")
+ Public Const moneda As String = "Euros"
+
+
+Public Const bot_base As String = ("Parámetros de configuración")
+Public Const bot_crearbd As String = ("Configurar el servidor de base de datos de TPV-ERP")
+Public Const bot_host As String = ("Host de la base de datos")
+Public Const bot_nombrebd As String = ("Nombre de la base de datos")
+Public Const bot_userbd As String = ("Usuario de la base de datos")
+Public Const bot_passbd As String = ("Password de la base de datos")
+Public Const bot_prefibd As String = ("Prefijo de las tablas de la base de datos")
+Public Const bot_admin As String = ("Usuario administrador de TPV-ERP")
+Public Const bot_passadmin As String = ("Contraseña del usuario administrador")
+Public Const bot_puerto As String = ("Puerto")
+Public Const bot_idioma As String = ("Idioma")
+Public Const bot_text As String = ("Test")
+Public Const bot_nterminal As String = ("Número de Terminal")
+
+'cadenas de menu
+Public Const menu_nuevo As String = ("Añadir")
+Public Const menu_grabar As String = ("Grabar")
+Public Const menu_editar As String = ("Editar")
+Public Const menu_Borrar As String = ("Borrar")
+Public Const menu_imprimir As String = ("Imprimir")
+Public Const menu_seleccionar As String = ("Seleccionar")
+Public Const menu_aceptar As String = ("Aceptar")
+Public Const menu_salir As String = ("Salir")
+Public Const menu_ayuda As String = ("Ayuda")
+Public Const menu_next As String = ("Siguiente")
+Public Const menu_previus As String = ("Previo")
+Public Const menu_zoom As String = ("Ver detalle")
+Public Const menu_filtrar As String = ("filtrar registros")
+
+'cadena de encriptación usada para la contraseña de usuario (8 caracteres)
+Public Const md5 As String = "ZzyU123K"
+
+
+
+
+'cadenas de ayuda
+Public Const help_user As String = ("Introduce el nombre de usuario -mínimo 6 caracteres-")
+Public Const help_pass As String = ("Introduce la contraseña -mínimo 6 caracteres-")
+Public Const help_host As String = ("Localización de la base de datos Ejemplo: localhost")
+Public Const help_nombrebd As String = ("Nombre que le daremos a la nueva base de datos Ejemplo: TPV-ERP")
+Public Const help_userbd As String = ("Nombre del administrador de la base de datos Ejemplo: root")
+Public Const help_passbd As String = ("Password del usuario administrador para acceder a la base de datos")
+Public Const help_prefibd As String = ("Prefijo para poner a las tablas de la base de datos Ejemplo: erp_")
+Public Const help_admin As String = ("Introduce el usuario administrador de TPV-ERP. No confundir con el Usuario de la Base de datos")
+Public Const help_passadmin As String = ("Contraseña del usuario administrador del TPV-ERP")
+Public Const help_idioma As String = ("Selecciona el idioma del TPV-ERP")
+
+'cadenas de texto de carácter general
+
+Public Const general_datosgenerales As String = ("Datos Generales")
+Public Const general_codigo As String = ("Código")
+Public Const general_descripcion As String = ("Descripción")
+Public Const general_porceniva As String = ("% I.V.A")
+Public Const general_porcenrecargo As String = ("% Recargo de equivalencia")
+Public Const general_nombre As String = ("Nombre")
+Public Const general_numero As String = ("Número")
+Public Const general_tipo As String = ("Tipo")
+Public Const general_nif As String = ("N.I.F.")
+Public Const general_direccion As String = ("Dirección")
+Public Const general_poblacion As String = ("Población")
+Public Const general_provincia As String = ("Provincia")
+Public Const general_codpostal As String = ("Código Postal")
+Public Const general_telefono As String = ("Teléfono")
+Public Const general_fax As String = ("Fax")
+Public Const general_web As String = ("Página Web")
+Public Const general_correo As String = ("E-mail")
+Public Const general_regmercantil As String = ("Reg. Mercantil")
+Public Const general_logotipo As String = ("Logotipo")
+Public Const general_imagen As String = ("Imagen")
+Public Const general_datosconexion As String = ("Datos de conexión")
+Public Const general_efectivo As String = ("Efectivo")
+Public Const general_verentpv As String = ("Ver en TPV")
+Public Const general_codbarras As String = ("Código de Barras")
+Public Const general_garantia As String = ("Garantía")
+Public Const general_lote As String = ("Lote")
+Public Const general_caducidad As String = ("Caducidad")
+Public Const general_anada As String = ("Añada")
+Public Const general_ordentpv As String = ("Orden en TPV")
+Public Const general_agente As String = ("Agente Comercial")
+Public Const general_fcobro As String = ("Forma de cobro")
+Public Const general_tarifas As String = ("Tarifas")
+Public Const general_direcionesenvio As String = ("Direcciones de Envío")
+Public Const general_datoscomerciales As String = ("Datos Comerciales")
+
+
+'cadenas de texto parametrizacion
+Public Const general_parametriza As String = ("Parametrización TPV")
+Public Const parametrizatpv_precioconiva As String = ("Precios de los artículos IVA incluido en la base de datos")
+Public Const parametrizatpv_ivadesglosado As String = ("Imprimir tickets con el IVA desglosado")
+Public Const parametrizatpv_identifica As String = ("Identificación de usuario  obligatoria por tiempo")
+Public Const parametrizatpv_seriet As String = ("Serie en Tickets")
+Public Const parametrizatpv_serief As String = ("Serie en Facturas")
+Public Const parametrizatpv_inipre As String = ("Número inicial de Prepago")
+Public Const parametrizatpv_initick As String = ("Número inicial de ticket")
+Public Const parametrizatpv_inifact As String = ("Número inicial de Factura")
+Public Const parametrizatpv_inicred As String = ("Número inicial de Crédito")
+Public Const parametrizatpv_tiempo As String = ("Tiempo en minutos")
+
+
+'Cadenas informativas
+Public Const inf_error_0001 As String = ("No se ha podido cargar el lenguaje plpgsql, revisa la sentencia SQL")
+Public Const inf_error_0002 As String = ("No se ha podido cargar la zona horaria, revisa la sentencia SQL")
+Public Const inf_error_0003 As String = ("No se ha podido crear la tabla historial, revisa la sentencia SQL")
+Public Const inf_error_0004 As String = ("No se ha podido crear la tabla personas, revisa la sentencia SQL")
+Public Const inf_error_0005 As String = ("No se ha podido crear la tabla empresas, revisa la sentencia SQL")
+Public Const inf_error_0006 As String = ("No se ha podido crear la tabla usuarios, revisa la sentencia SQL")
+Public Const inf_error_0007 As String = ("No se ha podido crear la tabla entradas, revisa la sentencia SQL")
+Public Const inf_error_0008 As String = ("No se ha podido crear la vista usu_personas, revisa la sentencia SQL")
+
+
+
+Public Const inf_error_0015 As String = ("Error de usuario o contraseña.")
+Public Const inf_error_0016 As String = ("Este usuario a quedado bloqueado.")
+Public Const inf_error_0017 As String = ("El usuario no está activo.")
+Public Const inf_error_0018 As String = ("El usuario no está activo.")
+Public Const inf_error_0019 As String = ("El usuario está bloqueado.")
+
+
+Public Const Error_ini As String = ("No se ha podido crear el archivo con los parámetros de conexión.")
+
+
+Public Const inf_errorconex As String = ("Error en la conexión. Revisa los parámetros")
+Public Const inf_conex As String = ("Conexión Establecida")
+Public Const inf_crearbase As String = ("¿Seguro que quieres crear la base de datos?")
+Public Const inf_borrarbase As String = ("Esta acción borrará cualquier base de datos con el mismo nombre. ¿Seguro que quieres crear la base de datos?")
+Public Const inf_error_edicion As String = ("No se ha podido editar ese registro")
+Public Const inf_error_borrar As String = ("No se ha podido borrar ese registro")
+Public Const inf_error_carga As String = ("No se ha podido cargar esos registros")
+Public Const inf_error_alta As String = ("No se ha podido dar de alta ese registro")
+Public Const inf_error_seleccionado As String = ("No se puede borrar este registro porque está seleccionado")
+Public Const inf_error_nomesas As String = ("No hay ninguna mesa abierta en ese comedor")
+Public Const inf_error_dni As String = ("NIF/CIF Incorrecto o repetido")
+Public Const inf_error_paran As String = ("Los parámetros de entrada no tienen el tipo adecuado")
+Public Const inf_error_altauser As String = ("ERROR en la función alta_usuarios")
+
+Public Const inf_borrarlogs As String = ("¿Seguro que quieres borrar todos los registros del fichero log?")
+Public Const inf_camporeq As String = ("El campo no puede estar vacío")
+Public Const inf_exitoinstalacion As String = ("Instalación realizada con éxito")
+Public Const inf_camponum As String = ("El campo requerido es numérico")
+Public Const inf_campolong As String = ("El campo requerido tiene que ser ")
+Public Const inf_caracteres As String = (" Número de caracteres incorrecto")
+Public Const inf_passworigual As String = (" Las dos contraseñas no son iguales. ¡¡Inténtalo otra vez!!")
+Public Const inf_edicion As String = ("¿Seguro que quieres cambiar este registro?")
+Public Const inf_borrar As String = ("¿Seguro que quieres borrar este registro?")
+Public Const inf_agregar As String = ("¿Seguro que quieres añadir este registro?")
+Public Const inf_exito As String = ("Registro añadido con éxito")
+Public Const inf_exito_edit As String = ("Registro editado con éxito")
+Public Const inf_no_edit As String = ("Estas en modo consulta. No puedes cambiar valores.")
+Public Const inf_si As String = ("Si")
+Public Const inf_no As String = ("No")
+Public Const inf_ninusuarios As String = ("No puedes borrar todos los usuarios")
+Public Const inf_cambioestado_activo As String = ("¿Seguro que quieres activar o desactivar este usuario?")
+Public Const inf_cambioestado_bloqueado As String = ("¿Seguro que quieres bloquear o desbloquear este usuario?")
+Public Const inf_nomesa As String = ("No hay seleccionada ninguna mesa")
+Public Const inf_mesarepe As String = ("¿Has repetido el número de mesa?")
+Public Const inf_precio As String = ("INTRODUCE EL PRECIO")
+Public Const inf_peso As String = ("INTRODUCE EL PESO EN KILOS")
+Public Const inf_cobro As String = ("INTRODUCE EL DINERO")
+Public Const inf_cambios As String = ("LOS CAMBIOS SON")
+Public Const inf_cobrar As String = ("¿SEGURO QUE VAS A HACER UN COBRO?")
+Public Const inf_imprimemesa As String = ("¡¡¡DEBES IMPRIMIR LA MESA PARA PODER COBRARLA!!!")
+Public Const inf_cliente As String = ("SELECCIONA EL CLIENTE")
+Public Const inf_asignarcliente As String = ("¿SEGURO QUE QUIERES VINCULAR UN CLIENTE?")
+Public Const inf_pasta As String = ("TIENES QUE INTRODUCIR UNA CANTIDAD")
+Public Const inf_pastabasta As String = ("NO COBRES DE MÁS QUE YA LO TIENES")
+Public Const inf_pastanotepases As String = ("NO COBRES DE MÁS TIO LISTO")
+Public Const inf_poncliente As String = ("PARA COBRAR A CRÉDITO O PREPAGO TIENES QUE SELECCIONAR UN CLIENTE EN EL TICKET")
+Public Const inf_multicobro As String = ("MULTICOBRO REALIZADO CORRECTAMENTE")
+Public Const inf_cobrook As String = ("COBRO REALIZADO CORRECTAMENTE")
+Public Const inf_clientesinsaldo As String = ("EL CLIENTE NO DISPONE DE SALDO SUFICIENTE PARA PAGAR, PRUEBA MULTICOBRO U OTRA OPCIÓN")
+Public Const inf_compensaprepago As String = ("Compensa")
+Public Const inf_salir As String = ("¿Seguro que quieres salir? Si sales se perderan TODOS los cambios hechos. Actua con precaucion")
+
+
+
+'Texto de impresoras
+Public Const impresora_puerto_error As String = "El puerto de la impresora no existe, el cajón no puede abrirse, ¡coja la llave!"
+Public Const impresora_puerto_error2 As String = "El puerto de la impresora no existe, avise al administrador!"
+Public Const impresora_puerto_error3 As String = "El puerto de la impresora que figura en la parametrización no existe."
+Public Const impresora_puerto_error4 As String = "Error al configurar el puerto."
+
+
+
+'Texto de Errores
+Public Const err_base As String = ("No se puede conectar con la base de datos. Revisa los parámetros de configuración")
+Public Const err_instalacion As String = ("No es posible realizar la instalación. Revisa el fichero de configuración")
+Public Const error_log As String = ("Ponte en contacto con el administrador. No puedo generar los Logs de errores")
+Public Const error_cargadatos As String = ("No se han podido cargar los datos de la tabla.")
+
+

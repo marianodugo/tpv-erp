@@ -1,0 +1,304 @@
+' Gambas module file
+
+'/ * *
+'*
+'* @ package mFuncionesg.module
+'* @ copyright 2009 2010 Luis Jorge Martin Aznar
+'* @ version 1.0
+'* @ review 2 
+'* @ author Luis Jorge Martin Aznar 
+'* @ e-mail ljma@telefonica.net
+'* creacion = 01/06/2010
+'* modificacion = 01/03/2011
+'*
+'* This file IS part OF TPV-ERP ©.
+'*
+'* This program IS free software: you can redistribute it AND / OR modify
+'* it under the terms OF the GNU General PUBLIC License AS published by
+'* the Free Software Foundation, either version 3 OF the License.
+'*
+'* This program IS distributed IN the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty OF
+'* MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.See the
+'* GNU General PUBLIC License FOR more details.
+'*
+'* You should have received a COPY OF the GNU General PUBLIC License
+'* along WITH this program.IfNOT, see < http: / / www.gnu.org / licenses / > .  
+'* /
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+''////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'/////////////////////FUNCIONES PARA INICIALIZAR /////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+
+Public Sub IniConfiguracion()
+
+'Una vez creaDO veremos en ~/.config/ga mba s un a rchivo con el nombre del
+'proyecto y.conf que tiene el siguiente contenido
+
+'En este caso se obtienen los parámetros pa ra una conexión a ba se de da tos
+'de un a rchivo.CONF previa mente crea do.
+'El m étodo settings tiene dos va lores. El primero es el va lor que obtendrá si
+'puede leer el a rchivo CONF.El segundo es el va lor que obtendr á si no puede
+'leerlo.
+  Dim inifile As Settings
+  mVarglobales.info_system.Add(System.User.Name)
+  mVarglobales.info_system.Add(System.Host)
+  mVarglobales.info_system.Add(Now)
+End
+
+
+
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'/////////////////////FUNCIONES DE COMPORTAMIENTO DE TECLAS /////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+
+'para pasar de un campo a otro con return o enter
+Public Sub tabulador(codigo As Variant)
+ Select codigo
+  Case Key.Enter, Key.Return
+  Desktop.SendKeys("[Tab]")
+  Default
+ End Select
+End
+
+
+
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'/////////////////////FUNCIONES PARA FORMATEAR CADENAS /////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+Public Function susti_encripta(texto As String) As String
+  texto = Replace$(texto, "\"", "'")
+End
+
+
+
+
+
+
+
+Public Function ahtml(nombre As String) As String
+Dim a As String = "&aacute;"
+Dim e As String = "&eacute;"
+Dim i As String = "&iacute;"
+Dim o As String = "&oacute;"
+Dim u As String = "&uacute;"
+Dim n As String = "&ntilde;"
+Dim primera As String = "&ordf;"
+Dim primero As String = "&ordm;"
+
+Dim Aa As String = "&Aacute;"
+Dim Ee As String = "&Eacute;"
+Dim Ii As String = "&Iacute;"
+Dim Oo As String = "&Oacute;"
+Dim Uu As String = "&Uacute;"
+Dim Nn As String = "&Ntilde;"
+
+
+
+      nombre = Replace$(nombre, "á", a)
+      nombre = Replace$(nombre, "é", e)
+      nombre = Replace$(nombre, "í", i)
+      nombre = Replace$(nombre, "ó", o)
+      nombre = Replace$(nombre, "ú", u)
+      nombre = Replace$(nombre, "ñ", n)
+      nombre = Replace$(nombre, "Á", Aa)
+      nombre = Replace$(nombre, "É", Ee)
+      nombre = Replace$(nombre, "Í", Ii)
+      nombre = Replace$(nombre, "Ó", Oo)
+      nombre = Replace$(nombre, "Ú", Uu)
+      nombre = Replace$(nombre, "Ñ", Nn)
+      nombre = Replace$(nombre, "º", primero)
+      nombre = Replace$(nombre, "ª", primera)
+  Return (nombre)
+End
+
+
+Public Function arrayplpgsql(matriz As String[]) As String
+Dim resultado As String
+Dim i As Integer
+    resultado = "{"
+    For i = 0 To (matriz.Count - 2)
+       resultado = resultado & fueracoma(matriz[i]) & ","
+    Next
+        resultado = resultado & fueracoma(matriz[matriz.Count - 1]) & "}"
+    Return resultado
+End
+
+
+
+Public Function conviertecoma(texto As String) As String
+'nos sirve para convertir el punto decimal en coma decimal.
+    Dim a As Integer
+    Dim letra As String
+    Dim cadena As String
+        For a = 1 To Len(texto)
+        letra = Mid$(texto, a, 1)
+        If letra = "." Then
+        cadena = cadena & ","
+       Else
+        cadena = cadena & letra
+        Endif
+       Next
+      Return cadena
+End
+
+Public Function conviertepunto(texto As String) As String
+'nos sirve para convertirla coma decimal en punto decimal.
+    Dim a As Integer
+    Dim letra As String
+    Dim cadena As String
+        For a = 1 To Len(texto)
+        letra = Mid$(texto, a, 1)
+        If letra = "," Then
+        cadena = cadena & "."
+       Else
+        cadena = cadena & letra
+        Endif
+       Next
+      Return cadena
+End
+
+
+
+
+
+Public Function fueracoma(texto As String) As String
+  texto = Replace$(texto, ",", "¬")
+  Return Replace$(texto, "'", "Ç")
+End
+
+Public Function holacoma(texto As String) As String
+  texto = Replace$(texto, "¬", ",")
+  Return Replace$(texto, "Ç", "'")
+End
+
+Public Function convierte_modena(texto As TextBox) As String
+    Dim numstr As String
+    Dim nun As Float
+    nun = Val(texto.Text)
+    numstr = Format$(nun, "#.#0")
+    texto.text = numstr
+End
+
+Public Function convierte_peso(texto As TextBox) As String
+    Dim numstr As String
+    Dim nun As Float
+    nun = Val(texto.Text)
+    numstr = Format$(nun, "##,##0.000")
+    texto.text = numstr
+End
+
+
+Public Function f_moneda(valor As Float) As String
+  Return Format$(valor, "$###,##0.00")
+End
+Public Function f_moneda3(valor As Float) As String
+  Return Format$(valor, "$###,##0.000")
+End
+
+Public Function f_peso(valor As Float) As String
+  Return Format$(valor, "###,##0.000")
+End
+
+Public Function f_cantidad(valor As Float) As String
+  Return Format$(valor, "###,##0.00")
+End
+
+Public Function f_decimal(valor As Float) As String
+  Return Format$(valor, "###,##0.00")
+End
+
+Public Function f_moneda_a_float(valor As String) As Float
+  Dim parte As New String[]
+  Dim final As Float
+  'quitamos el simbolo euro
+   parte = Split(valor, " ")
+   'quita los puntos si los hay
+   parte[0] = Replace$(parte[0], ".", "")
+  'reemplaza la coma por punto
+   final = Replace$(parte[0], ",", ".")
+   Return final
+End
+
+Public Function f_variant_a_float(valor As String) As Float
+  Dim final As Float
+    'quitamos los espacios en blanco
+   valor = Replace$(valor, " ", "")
+   'quita los puntos si los hay
+   valor = Replace$(valor, ".", "")
+  'reemplaza la coma por punto
+   final = Replace$(valor, ",", ".")
+   Return final
+End
+
+
+
+
+
+
+
+''////////////////////////////////////////////////////////////////////////////////////////////////
+'/////////////////////LOG DE ERRORES ////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+
+Private Sub coge_error(Optional datos As String[])
+  Dim texto_error As String = error.Text
+  Dim donde_error As String = error.Where
+  Dim err As String
+  Dim Backtrace_error As String
+  For Each err In Error.Backtrace
+      Backtrace_error = Backtrace_error & "//" & err
+  Next
+  If datos <> Null Then
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error, datos)
+  Else
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error)
+  Endif
+End
+
+
+
+
+Public Sub logea(texto_error As String, donde_error As String, Backtrace_error As String, Optional datos As String[])
+  Dim datos_array As String
+  Dim archivo As File
+  Dim i As Integer = 0
+        archivo = Open (mVarglobales.sPathTpvLog & "/error.log") For Output Append
+        Print #archivo, "----------------------------------------------------------------------------------------"
+        Print #archivo, Date & " " & Time
+        Try Print #archivo, "Usuario: " & mVarglobales.sUsername & " Terminal:" & mVarglobales.sNterminal & " Empresa:" & mVarglobales.sIdEmpresa
+        Print #archivo, donde_error
+        Print #archivo, texto_error
+        Print #archivo, Backtrace_error
+        If datos <> Null Then
+           For Each datos
+              datos_array = datos_array & "," & datos[i]
+              i = i + 1
+           Next
+           Print #archivo, datos_array
+        Endif
+        Close #archivo
+  Catch
+  If archivo <> Null Then 
+    Close #archivo
+  Endif
+  Message.Warning(mConstantes.error_log)
+End

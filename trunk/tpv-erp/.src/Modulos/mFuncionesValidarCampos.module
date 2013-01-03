@@ -1,0 +1,156 @@
+' Gambas module file
+
+'/ * *
+'*
+'* @ package mFuncionesValidarCampos.module
+'* @ copyright 2009 2010 Luis Jorge Martin Aznar
+'* @ version 1.0
+'* @ review 2 
+'* @ author Luis Jorge Martin Aznar 
+'* @ e-mail ljma@telefonica.net
+'* creacion = 01/06/2010
+'* modificacion = 01/03/2011
+'*
+'* This file IS part OF TPV-ERP ©.
+'*
+'* This program IS free software: you can redistribute it AND / OR modify
+'* it under the terms OF the GNU General PUBLIC License AS published by
+'* the Free Software Foundation, either version 3 OF the License.
+'*
+'* This program IS distributed IN the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty OF
+'* MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.See the
+'* GNU General PUBLIC License FOR more details.
+'*
+'* You should have received a COPY OF the GNU General PUBLIC License
+'* along WITH this program.IfNOT, see < http: / / www.gnu.org / licenses / > .  
+'* /
+
+
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'/////////////////////FUNCIONES PARA VALIDAR CAMPOS /////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'
+
+'Public Function CompruebaTextboxObligatorios(formulario As Form) As Boolean
+'Dim Ctrl As Object
+'  For Each Ctrl In formulario.Controls
+'     If Ctrl Is CTexBox Then
+'            If Ctrl.Obligatorio = True And Ctrl.IsValid = False Then 'si es obligatorio no válido Fallo
+'               Return False 
+ '           Endif
+ '    Endif
+'  Next
+'  Return True
+'End
+
+
+Public Function validar_numero(campo As TextBox) As Boolean
+  If IsNumber(campo.text) Then
+    Return True
+  Else
+    campo.text = ""
+    campo.Background = &FF0000&
+    Return False
+  Endif 
+End
+
+Public Function validar_numero_conpunto(campo As TextBox) As String
+  Dim numero As String
+  numero = conviertecoma(campo.Text)
+  If IsNumber(Val(numero)) Then
+    Return numero
+  Else
+    campo.text = ""
+    campo.Background = &FF0000&
+    Return "FALSE"
+  Endif 
+End
+
+Public Function validar_telefono(campo As TextBox) As Boolean
+  If IsNumber(Val(campo.text)) Then
+     If Len(campo.Text) = 9 Then 
+         Return True
+     Else 
+         Message.Info((""))
+        campo.text = ""
+        campo.Background = &FF0000&
+     Endif 
+    Return True
+  Else
+    Message.Info((""))
+    campo.text = ""
+    campo.Background = &FF0000&
+    Return False
+  Endif 
+End
+
+
+Public Function validar_vacio(campo As TextBox) As Boolean
+  If campo.Text = "" Then 
+    Message.Info((""))
+    Return False
+  Else 
+    Return True
+  Endif 
+End
+
+
+Public Function validar_longuitud(campo As TextBox, l As Integer, op As String) As Boolean
+   Select op
+    Case "="
+      If Len(campo.Text) = l Then 
+        Return True
+      Else 
+        Message.Info(("" & " = a " & l & ("")))
+        campo.SetFocus
+        Return False
+      Endif
+
+    Case "<"
+      If Len(campo.Text) < l Then 
+        Return True
+      Else 
+        Message.Info(("" & " < a " & l & ("")))
+        campo.SetFocus
+        Return False
+      Endif
+    
+    Case ">"
+      If Len(campo.Text) > l Then 
+        Return True
+      Else 
+        Message.Info(("" & " > a " & l & ("")))
+        campo.SetFocus
+        Return False
+      Endif
+    
+    Case "<>"
+      If Len(campo.Text) <> l Then 
+        Return True
+      Else 
+        Message.Info(("" & " <> a " & l & ("")))
+        campo.SetFocus
+        Return False
+      Endif
+    End Select
+End
+
+Public Function conviertecoma(texto As String) As String
+'nos sirve para convertir el punto decimal en coma decimal.
+    Dim a As Integer
+    Dim letra As String
+    Dim cadena As String
+        For a = 1 To Len(texto)
+        letra = Mid$(texto, a, 1)
+        If letra = "." Then
+        cadena = cadena & ","
+       Else
+        cadena = cadena & letra
+        Endif
+       Next
+      Return cadena
+End
+
