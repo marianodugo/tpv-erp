@@ -1,0 +1,188 @@
+' Gambas module file
+
+Private Function generar_claves(contra As String) As Boolean
+  Dim sEspera As String
+      'Cifrar la clave privada con DES para evitar su uso fraudulento:
+   Shell Subst("openssl genrsa -out " & "/tmp/tpv.key -passout pass:" & contra & " -des3 1024 ") To sEspera
+     ' Generar claves públicas derivadas:
+   Shell Subst("openssl rsa -in " & "/tmp/tpv.key -pubout -out " & "/tmp/tpv_publica.key -passin pass:" & contra) To sEspera
+End
+
+Public Function encripta(texto As String) As String
+ Dim sEspera As String
+ Dim fTamano As Float
+ Dim sLlave_publica As String
+ Dim sCadena_encriptada As String
+ Dim F As File
+    
+    sLlave_publica = cargaLlavePublica()
+    F = Open "/tmp/tpv_publica.key" For Create 'abrir el archivo 
+    Write #f, sLlave_publica
+    F.Close 'cerrar el fichero
+
+    Shell Subst("echo -n " & texto & "| openssl rsautl -pubin -encrypt  -out " & "/tmp/temp.txt" & " -inkey " & "/tmp/tpv_publica.key") To sEspera
+    fTamano = Stat("/tmp/temp.txt").Size
+    F = Open "/tmp/temp.txt" For Input 'abrirlo para lectura
+    Read #f, sCadena_encriptada, fTamano 'leer el archivo y dejarlo en la variable string 
+    F.Close
+    Try Kill "/tmp/temp.txt"
+    Try Kill "/tmp/tpv_publica.key"
+    Return sCadena_encriptada
+End
+
+
+Public Function desencripta(sCadena_encriptada As String) As String
+    Dim sOut As String
+    Dim sLlave_privada As String
+    Dim sPassword As String
+    Dim F As File 'declarar un manejador de fichero
+
+    sPassword = cargaPassword()
+    sLlave_privada = cargaLlavePrivada()
+    
+    F = Open "/tmp/tpv.key" For Create 'abrir el archivo 
+    Write #f, sLlave_privada
+    F.Close 'cerrar el fichero
+    
+    F = Open "/tmp/temp.txt" For Create 'abrir el archivo 
+    Write #f, sCadena_encriptada
+    F.Close 'cerrar el fichero
+    Shell Subst("echo =| openssl rsautl -decrypt -in " & "/tmp/temp.txt" & "  -inkey " & "/tmp/tpv.key -passin pass:" & sPassword) To sOut
+    Try Kill "/tmp/temp.txt"
+    Try Kill "/tmp/tpv.key"
+    Return sOut
+End
+
+
+Private Function cargaLlavePublica() As String
+Dim sLlave_publica As String
+  sLlave_publica = "-----BEGIN PUBLIC KEY-----" & "\n"
+  sLlave_publica &= "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCfo9dizwZ3hiDPLYiAQsSrMpJt" & "\n"
+  sLlave_publica &= "RrQU8StGeTe08EfRkcjM5cd8lWoyRDQz35RWTDLJJQPnaFRq//6vN1R/pGyjd2b5" & "\n"
+  sLlave_publica &= "8IsRhqFs4W7DsW+3Nv9fjetzeJxiqjRomCvN0u7moeRv1mK0KVwbMu3cWrRpBSas" & "\n"
+  sLlave_publica &= "3jDkdzNXuyGxBqVCTwIDAQAB" & "\n"
+  sLlave_publica &= "-----END PUBLIC KEY-----"
+  Return sLlave_publica
+End
+
+
+Private Function cargaPassword() As String
+  Return "ZzyU123K" 
+End
+
+Private Function cargaLlavePrivada() As String
+Dim sLlave_privada As String
+
+  sLlave_privada = "-----BEGIN RSA PRIVATE KEY-----" & "\n"
+  sLlave_privada &= "Proc-Type: 4,ENCRYPTED" & "\n"
+  sLlave_privada &= "DEK-Info: DES-EDE3-CBC,69378458BE71BDF2" & "\n"
+  sLlave_privada &= "\n"
+  sLlave_privada &= "e1o1hUUWeK1Ptql0VtxMSCboV2Rvy+BPVlG1GF3gEV050FBgv0fdMO+BVLNbFhm2" & "\n"
+  sLlave_privada &= "0SuNfo4MIPKvQaFY9lZEFyNYeoYPfOIu+pK0kO3pE2RoHmf/vvv0hHveDewpfQ50" & "\n"
+  sLlave_privada &= "eep3XgKbJ9dz+SceowlrtcgItjGvngBrWrjRyyAegsRFVLxJVR6BTgkTotarpQyQ" & "\n"
+  sLlave_privada &= "1KBoGQkYdJA36u/SrWOi7bQsMUhgmLRpIAhxfy+NQMNq515E6LUfAdSOPCVJDrIP" & "\n"
+  sLlave_privada &= "12eYxkyb/cZu2XKHz57wQncjHO+lirFIWVTaQQRdZ5LozO99rkEJTlMsTeghJHb3" & "\n"
+  sLlave_privada &= "sUFlHQdgTQfdVJsw7KxRK8t80GPsooyW1gDH3UiGUDW1cSsHp/ItnpmEm430EKGC" & "\n"
+  sLlave_privada &= "BDdzSW9eLHbjqoyw3n7uC3qM5fQRr8C+7IfhReDXkkfvTdG9HB3ZcvZIXDAktHYw" & "\n"
+  sLlave_privada &= "o8iC7XGGLnO2ajgJdJpPcexgypNqwXPCFumbHd9aPMlfU3sQXP/03kdSfti+wJ44" & "\n"
+  sLlave_privada &= "1wvPk7UblII88tY++IZy9D0AR2KRfpXB72TBe+CZCBXP+R69250aFVJ0ap5C11rq" & "\n"
+  sLlave_privada &= "8oFhcfCHs4eJAd0qax/XOs6ZIRPmwZC9dkE4ns8ziwLfVPtSd/0rP5juvSph9C8Q" & "\n"
+  sLlave_privada &= "+mGLIQtwHMOzcT+sK0Qlii6+ltd7HxQmyH+hw0qjGHRiw3F1VRJohAdBN1BmC8+d" & "\n"
+  sLlave_privada &= "lUrmKIDE7vI467LHorY+hQpdLxRyBH0aTcQRcV5be6lPIucWqhV0fGQ+s9CATW9y" & "\n"
+  sLlave_privada &= "c0V2nBG+tGm2iMuhyOc2i/U/27relDUglibr8Og5q7O66Qku8wrs4Q==" & "\n"
+  sLlave_privada &= "-----END RSA PRIVATE KEY-----"
+  Return sLlave_privada
+End
+
+
+
+
+Public Function crea_ini(sValores As String[], sNombre As String) As Boolean
+    
+    Dim f As File
+    Dim sValor As String
+    Dim encriptado As New String[]
+
+    For Each sValor In sValores
+        encriptado.Add(mFuncionesEncriptar.encripta(sValor)) 
+    Next
+    sNombre = mVarglobales.sPathTpvIni & "/" & sNombre
+    
+     f = Open sNombre For Create 'abrir el archivo 
+     '"BD_HOST="
+     Write #f, encriptado[0]
+     '"BD_PUERTO="
+     Write #f, encriptado[1]
+     '"BD_NAME="
+     Write #f, encriptado[2]
+     '"BD_USUARIO="
+     Write #f, encriptado[3]
+     '"BD_PASS="
+     Write #f, encriptado[4]
+     '"­BD_PREFI="
+      Write #f, encriptado[5]
+      '"BD_HECHA="
+      Write #f, encriptado[8]
+      '"BD_IDIOMA="
+      Write #f, encriptado[9]
+      '"NÚMERO DE TERMINAL="
+      Write #f, encriptado[10]
+      f.Close 'cerrar el fichero
+      Return True
+     
+      Catch 
+          Message.Error(error.Text) 
+          coge_error()
+          Return False
+End
+
+
+
+
+Public Function Lee_ini(sNombre As String) As String[]
+    Dim hFile As File
+    Dim lTamano As Long
+    Dim n As Integer
+    Dim i As Integer
+    Dim sLine As String
+    Dim sEncriptado As New String[]
+
+      If Exist(mVarglobales.sPathTpvIni & "/" & sNombre) Then 
+            sNombre = (mVarglobales.sPathTpvIni & "/" & sNombre)
+            lTamano = Stat(sNombre).Size
+            n = lTamano / 128              'averiguamos las lineas
+      
+            hFile = Open sNombre For Read
+            For i = 1 To n
+                  Read #hFile, sLine, 128 
+                  sEncriptado.Add(mFuncionesEncriptar.desencripta(sLine))
+            Next 
+      
+            hFile.Close
+      Endif
+      Return sEncriptado
+      
+      Catch 
+          Message.Error(error.Text) 
+          coge_error()
+          Return sEncriptado
+End
+
+
+
+
+Private Sub coge_error(Optional datos As String[])
+  Dim texto_error As String = error.Text
+  Dim donde_error As String = error.Where
+  Dim err As String
+  Dim Backtrace_error As String
+  For Each err In Error.Backtrace
+      Backtrace_error = Backtrace_error & "//" & err
+  Next
+  If datos <> Null Then
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error, datos)
+  Else
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error)
+  Endif
+End
+
