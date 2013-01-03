@@ -1,0 +1,234 @@
+' Gambas class file
+
+' mVarglobales públicas
+
+
+
+Public DbConn As Connection
+Public DbConn2 As Connection
+Private BD_HOST As Variant
+Private BD_NAME As Variant
+Private BD_USUARIO As Variant
+Private BD_PASS As Variant
+Private BD_PREFI As Variant
+Private BD_PUERTO As Variant
+Private BD_HECHA As Variant
+
+
+' Constructor
+Public Sub _new(matriz As String[])
+   BD_HOST = matriz[0]
+   BD_PUERTO = matriz[1]
+   BD_NAME = LCase$(matriz[2])
+   BD_USUARIO = matriz[3]
+   BD_PASS = matriz[4]
+   Me.DbConn = New Connection
+End
+
+
+' Destructor
+Public Sub _free()
+  Try Me.DbConn.Close()
+  If Error Then
+    coge_error()
+  Endif
+End
+
+'===============================================================================
+'  METHODS
+'===============================================================================
+
+' Execute login to database
+' Parámetros: los normales de conexión
+ Public Function DBconectar() As Boolean
+   If Me.DbConn.Opened Then
+     Me.DbConn.Close()  'Nos aseguramos que está cerrada la conexión
+   Endif
+   Me.DbConn.Type = "postgresql"
+   Me.DbConn.Host = BD_HOST
+   Me.DbConn.Port = BD_PUERTO
+   Me.DbConn.Name = BD_NAME
+   Me.DbConn.Login = BD_USUARIO
+   Me.DbConn.Password = BD_PASS
+   Me.DbConn.Open
+  Return True
+ Catch
+  Message.Error(mConstantes.err_base)
+  coge_error()
+  Return False
+End
+'para poder borrar la base de datos
+Public Function DBconectarsinbase() As Boolean
+   If Me.DbConn.Opened Then
+     Me.DbConn.Close()  'Nos aseguramos que está cerrada la conexión
+   Endif
+   Me.DbConn.Type = "postgresql"
+   Me.DbConn.Host = BD_HOST
+   Me.DbConn.Port = BD_PUERTO
+   'ME.DbConn.Name = BD_NAME
+   Me.DbConn.Login = BD_USUARIO
+   Me.DbConn.Password = BD_PASS
+   Me.DbConn.Open
+  Return True
+ Catch
+  Message.Error(mConstantes.err_base)
+  coge_error()
+  Return False
+End
+
+
+
+
+
+Public Function recarga(matriz As String[]) As Boolean
+   BD_HOST = matriz[0]
+   BD_PUERTO = matriz[1]
+   BD_NAME = LCase$(matriz[2])
+   BD_USUARIO = matriz[3]
+   BD_PASS = matriz[4]
+   DBconectar()
+   Return True
+  Catch
+  Message.Error(Error.Text)
+  coge_error()
+  Return False
+End
+
+'para crear y borrar
+Public Function recargasinbase(matriz As String[]) As Boolean
+   BD_HOST = matriz[0]
+   BD_PUERTO = matriz[1]
+   'BD_NAME = LCase$(matriz[2])
+   BD_USUARIO = matriz[3]
+   BD_PASS = matriz[4]
+   If DBconectarsinbase() = True Then
+      Return True
+   Else
+      Return False
+   Endif
+  Catch
+  Message.Error(Error.Text)
+  coge_error()
+  Return False
+End
+
+
+
+' Close connection to database
+Public Sub DBclose()
+  Try Me.DbConn.Close()
+End
+
+Public Sub DBclose2()
+  Try Me.DbConn.Close2()
+End
+
+
+' Return current database version
+Public Function getVersion() As String
+  Dim q As Result = Me.DbConn.Exec("SELECT VERSION() AS version")
+  If (Not IsNull(q)) Then Return q["version"]
+  Return ""
+End
+'---
+
+Public Function BorrarBase(nombre As String) As String
+   If Me.DbConn.Databases.Exist(LCase$(nombre)) Then
+     Me.DbConn.Databases.Remove(LCase$(nombre))
+   Endif
+End
+
+
+
+
+
+
+Public Function creabasenueva(nombre As String) As String
+        If Not Me.DbConn.Databases.Exist(LCase$(nombre)) Then
+          Me.DbConn.Databases.Add(LCase$(nombre))
+          Return "NUEVA"
+        Else
+          If Message.Question(("Esta empresa existe ya. ¿Quieres Conectarte o crearla nueva?"), ("Conectarme"), ("Crearla")) = 2 Then
+                  If Message.Question(("Esto implica borrar la base de datos que tiene el mismo nombre. ¿Estás segur@?"), mConstantes.inf_si, mConstantes.inf_no) = 1 Then
+                      Me.DbConn.Databases.Remove(LCase$(nombre))
+                      Me.DbConn.Databases.Add(LCase$(nombre))
+                      Return "NUEVA"
+                  Else
+                      Return "CONECTAR"
+                  Endif
+          Else
+                  Return "CONECTAR"
+          Endif
+        Endif
+  Catch
+  Message.Error(Error.Text)
+  coge_error()
+  Return "ERROR"
+End
+
+
+Public Function creabasenueva_sinconectar(nombre As String) As String
+        If Not Me.DbConn.Databases.Exist(LCase$(nombre)) Then
+          Me.DbConn.Databases.Add(LCase$(nombre))
+          Return "NUEVA"
+        Else
+          Me.DbConn.Databases.Remove(LCase$(nombre))
+          Me.DbConn.Databases.Add(LCase$(nombre))
+          Return "NUEVA"
+        Endif
+  Catch
+  Message.Error(Error.Text)
+  coge_error()
+  Return "ERROR"
+End
+
+
+
+
+
+Public Function test(matriz As String[]) As Boolean
+   Dim Rs As Result
+   Dim sDatestyle As New String[]
+  'connect to database
+   Me.DbConn2 = New Connection
+   If Me.DbConn2.Opened Then
+     Me.DbConn2.Close()  'Nos aseguramos que está cerrada la conexión
+   Endif
+   Me.DbConn2.Type = "postgresql"
+   Me.DbConn2.Host = matriz[0]
+   Me.DbConn2.Port = matriz[1]
+   Me.DbConn2.Login = matriz[3]
+   Me.DbConn2.Password = matriz[4]
+   Me.DbConn2.Open
+   Rs = Me.DbConn2.Exec("SHOW DateStyle")
+   sDatestyle = Split(Rs[0], ",")
+   If LTrim$(sDatestyle[1]) <> "DMY" Then
+     Message.Warning(("El Formato de fecha en Postgres no es DMY"))
+     Me.DbConn2.Close
+     Return False
+   Endif
+   Me.DbConn2.Close
+  Return True
+ Catch
+  Message.Error(("Fallo de Test. Revisa los parámetros."))
+  Me.DbConn2.Close()
+  coge_error()
+  Return False
+End
+
+
+
+Private Sub coge_error(Optional datos As String[])
+  Dim texto_error As String = error.Text
+  Dim donde_error As String = error.Where
+  Dim err As String
+  Dim Backtrace_error As String
+  For Each err In Error.Backtrace
+      Backtrace_error = Backtrace_error & "//" & err
+  Next
+  If datos <> Null Then
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error, datos)
+  Else
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error)
+  Endif
+End
