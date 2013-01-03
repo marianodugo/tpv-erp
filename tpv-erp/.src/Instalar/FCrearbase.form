@@ -1,0 +1,166 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,115,99)
+  Icon = Picture["img/tux_currito.png"]
+  Maximized = True
+  AutoResize = True
+  { Frame1 Frame
+    MoveScaled(4,22,110,72)
+    { host TextBox texto
+      Name = "host"
+      MoveScaled(46,14,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("localhost")
+    }
+    { puerto TextBox texto
+      Name = "puerto"
+      MoveScaled(46,18,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("5432")
+    }
+    { basedatos TextBox texto
+      Name = "basedatos"
+      MoveScaled(46,22,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("TPVE")
+    }
+    { usuario TextBox texto
+      Name = "usuario"
+      MoveScaled(46,26,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("postgres")
+    }
+    { passwordbd TextBox texto
+      Name = "passwordbd"
+      MoveScaled(46,30,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("postgres")
+      Password = True
+    }
+    { prefijo TextBox texto
+      Name = "prefijo"
+      MoveScaled(46,34,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("erp_")
+    }
+    { user TextBox texto
+      Name = "user"
+      MoveScaled(46,38,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("administrador")
+    }
+    { passworduser TextBox texto
+      Name = "passworduser"
+      MoveScaled(46,42,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Password = True
+    }
+    { terminal TextBox texto
+      Name = "terminal"
+      MoveScaled(46,46,55,4)
+      Background = &H5FFFAF&
+      Foreground = &HFF0000&
+      Text = ("1")
+      MaxLength = 2
+    }
+    { Label9 Label
+      MoveScaled(5,18,40,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { Label2 Label
+      MoveScaled(6,22,39,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { Label3 Label
+      MoveScaled(13,26,32,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { Label4 Label
+      MoveScaled(7,30,38,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { Label5 Label
+      MoveScaled(8,34,37,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { Label7 Label
+      MoveScaled(13,38,32,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { Label8 Label
+      MoveScaled(10,42,35,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { Label1 Label
+      MoveScaled(10,14,35,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { text Button
+      MoveScaled(29,51,15,5)
+      Text = ("Button3")
+      Picture = Picture["icon:/32/apply"]
+    }
+    { aceptar Button
+      MoveScaled(48.8571,50.8571,15,5)
+      Enabled = False
+      Text = ("Button1")
+      Picture = Picture["icon:/32/disconnect"]
+    }
+    { cancelar Button
+      MoveScaled(70,51,15,5)
+      Text = ("Button1")
+      Picture = Picture["icon:/32/close"]
+    }
+    { ProgressBar1 ProgressBar
+      MoveScaled(2.8571,56.8571,107,4)
+      Visible = False
+      Foreground = &HFF0000&
+    }
+    { Label6 Label
+      MoveScaled(6,5,91,4)
+      Font = Font["+4"]
+      Foreground = &HFF0000&
+      Text = ("Label6")
+      Alignment = Align.Center
+    }
+    { Label10 Label
+      MoveScaled(10,10,35,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+    { ComboBox1 ComboBox
+      MoveScaled(46,10,55,4)
+      ReadOnly = True
+      List = [("Español"), ("Inglés")]
+      Sorted = True
+    }
+    { Label11 Label
+      MoveScaled(10,46,35,4)
+      Text = ("Label1")
+      Alignment = Align.Right
+    }
+  }
+  { tux PictureBox
+    MoveScaled(48,7,12,14)
+    Expand = True
+    Picture = Picture["img/tux_currito.png"]
+    Stretch = True
+  }
+}
