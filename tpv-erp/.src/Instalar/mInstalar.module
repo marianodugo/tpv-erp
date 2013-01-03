@@ -1,0 +1,2396 @@
+' Gambas module file
+
+'/ * *
+'*
+'* @ package mInstalar.module
+'* @ copyright 2009 2010 Luis Jorge Martin Aznar
+'* @ version 1.0
+'* @ review 1 
+'* @ author Luis Jorge Martin Aznar 
+'* @ e-mail ljma@telefonica.net
+'* creacion = 01/06/2010
+'* modificacion = 01/06/2010
+'*
+'* This file IS part OF TPV-ERP ©.
+'*
+'* This program IS free software: you can redistribute it AND / OR modify
+'* it under the terms OF the GNU General PUBLIC License AS published by
+'* the Free Software Foundation, either version 3 OF the License.
+'*
+'* This program IS distributed IN the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty OF
+'* MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.See the
+'* GNU General PUBLIC License FOR more details.
+'*
+'* You should have received a COPY OF the GNU General PUBLIC License
+'* along WITH this program.IfNOT, see < http: / / www.gnu.org / licenses / > .  
+'* /
+ 
+Public BD_PREFI As String
+Public C As CPostgres
+ 
+ Private Sub respaldo(nombretabla As String, campoid As String, updatedby As String)
+      Dim sql As String
+      Dim Rs As Result
+      Dim nombrecolumna As String   'Fcrearbase.C
+      
+      sql = "SELECT column_name FROM information_schema.columns WHERE table_name = '"
+      sql = sql & nombretabla & "'"
+      Rs = C.DbConn.Exec(sql)
+    
+      sql = "CREATE OR REPLACE FUNCTION " & nombretabla & "() RETURNS trigger AS ' begin "
+      
+      Do While Rs.Available
+            nombrecolumna = Rs["column_name"]
+            sql = sql & " IF (old." & nombrecolumna & " != NEW." & nombrecolumna & ") THEN " & "\n"
+            sql = sql & "insert into " & mInstalar.BD_PREFI & "historial(created, createdby, tabla, campo, id, oldvalue, newvalue)" & "\n"
+            sql = sql & " values(" & "\n"
+            sql = sql & " now()," & "\n"
+            sql = sql & " new." & updatedby & "," & "\n"
+            sql = sql & "''" & nombretabla & "''," & "\n"
+            sql = sql & "''" & nombrecolumna & "''," & "\n"
+            sql = sql & " old." & campoid & "," & "\n"
+            sql = sql & " old." & nombrecolumna & "," & "\n"
+            sql = sql & " new." & nombrecolumna & "\n"
+            sql = sql & ");" & "\n"
+            sql = sql & " end if;" & "\n"
+            Rs.MoveNext
+      Loop
+      sql = sql & " return null;" & "\n"
+      sql = sql & " end;" & "\n"
+      sql = sql & "' LANGUAGE 'plpgsql'" & "\n"
+      Rs = C.DbConn.Exec(sql)
+      
+      sql = "CREATE TRIGGER " & nombretabla & "\n"
+      sql = sql & " AFTER UPDATE" & "\n"
+      sql = sql & " ON  " & nombretabla & "\n"
+      sql = sql & " FOR EACH ROW" & "\n"
+      sql = sql & " EXECUTE PROCEDURE  " & nombretabla & "();"
+      Rs = C.DbConn.Exec(sql)
+End
+
+
+
+ Private Sub respaldo_borrar(nombretabla As String, campoid As String, updatedby As String)
+      Dim sql As String
+      Dim Rs As Result
+      Dim nombrecolumna As String
+      Dim nombretabla1 As String
+    
+      nombretabla1 = nombretabla & "_del"
+    
+      sql = "SELECT column_name FROM information_schema.columns WHERE table_name = '"
+      sql = sql & nombretabla & "'"
+      Rs = C.DbConn.Exec(sql)
+    
+      
+      sql = "CREATE OR REPLACE FUNCTION " & nombretabla1 & "() RETURNS trigger AS ' begin "
+      
+      Do While Rs.Available
+            nombrecolumna = Rs["column_name"]
+            sql = sql & "insert into " & mInstalar.BD_PREFI & "historial(created, createdby, tabla, campo, id, oldvalue, newvalue)" & "\n"
+            sql = sql & " values(" & "\n"
+            sql = sql & " now()," & "\n"
+            sql = sql & " old." & updatedby & "," & "\n"
+            sql = sql & "''" & nombretabla & "''," & "\n"
+            sql = sql & "''" & nombrecolumna & "''," & "\n"
+            sql = sql & " old." & campoid & "," & "\n"
+            sql = sql & " old." & nombrecolumna & "," & "\n"
+            sql = sql & " ''borrado''" & "\n"
+            sql = sql & ");" & "\n"
+            Rs.MoveNext
+      Loop
+      sql = sql & " return null;" & "\n"
+      sql = sql & " end;" & "\n"
+      sql = sql & "' LANGUAGE 'plpgsql'"
+      Rs = C.DbConn.Exec(sql)
+      
+       
+       sql = "CREATE TRIGGER " & nombretabla1 & "\n"
+       sql = sql & " AFTER DELETE" & "\n"
+       sql = sql & " ON  " & nombretabla & "\n"
+       sql = sql & " FOR EACH ROW" & "\n"
+       sql = sql & " EXECUTE PROCEDURE  " & nombretabla1 & "();"
+       Rs = C.DbConn.Exec(sql)
+  
+End
+
+
+Public Function cargartablas(sDatos As String[], ProgressBar1 As ProgressBar) As Boolean
+Dim sql As String
+Dim query As String
+Dim error_carga As String
+Dim pass As String
+Dim porcen As Long
+Dim hFile As File
+Dim sLine As String
+
+C = New CPostgres(sDatos)
+porcen = 1
+
+mInstalar.BD_PREFI = sDatos[5]
+ProgressBar1.Visible = True
+Wait 0.1
+ProgressBar1.Left = 0
+ProgressBar1.Refresh
+Wait 0.1
+'Crea la base de datos nueva
+  If C.DBconectarsinbase() = True Then
+            ' If C.creabasenueva(sDatos[2]) = "CONECTAR" Then
+            '     Return True
+            ' Endif
+                 C.creabasenueva_sinconectar(sDatos[2]) 
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+             
+            'abrimos la nueva base de datos y comenzamos la transación
+             C.DBconectar
+             C.DbConn.Begin
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+                 
+            sql = "drop language if exists plpgsql cascade"
+            error_carga = (mConstantes.inf_error_0001)
+            Try C.DbConn.Exec(sql)
+                 
+            sql = "CREATE TRUSTED LANGUAGE plpgsql HANDLER language_handler_in"
+            error_carga = (mConstantes.inf_error_0001)
+            C.DbConn.Exec(sql)
+           
+            sql = "SET TIME ZONE 'Europe/Rome'"
+            error_carga = (mConstantes.inf_error_0002)
+            C.DbConn.Exec(sql)
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+           
+           
+            sql = "DROP TABLE if exists " & mInstalar.BD_PREFI & "historial CASCADE"
+            C.DbConn.Exec(sql)
+           
+             sql = "CREATE TABLE " & mInstalar.BD_PREFI & "historial("
+             sql = sql & "id_historial serial NOT NULL,"
+             sql = sql & "created timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "createdby numeric(10) DEFAULT 0,"
+             sql = sql & "tabla varchar(60),"
+             sql = sql & "campo varchar(60),"
+             sql = sql & "id numeric(10) NOT NULL,"
+             sql = sql & "oldvalue text,"
+             sql = sql & "newvalue text,"
+             sql = sql & "CONSTRAINT historial1_pkey PRIMARY KEY(id_historial)"
+             sql = sql & ")"
+             error_carga = (mConstantes.inf_error_0003)
+             C.DbConn.Exec(sql)
+           
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+           
+           
+            sql = "DROP FUNCTION if exists compruebacif(text) CASCADE"
+            C.DbConn.Exec(sql)
+            
+            sql = "  CREATE OR Replace FUNCTION compruebacif(text) "
+            sql = sql & " RETURNS BOOLEAN AS "
+            sql = sql & " $BODY$ DECLARE "
+            sql = sql & "/********************************************************************************************************" & "\n"
+            sql = sql & "* The contents OF this file are subject TO the GPL V.3" & "\n"
+            sql = sql & "* The Original Code IS TPV - ERP." & "\n"
+            sql = sql & "* All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+            sql = sql & "* All Rights Reserved." & "\n" & "\n"
+            sql = sql & "Retorna TRUE si hay coincidencia" & "\n"
+            sql = sql & "Retorna FALSE si no hay coincidencia en nie" & "\n"
+            sql = sql & "********************************************************************************************************/" & "\n"
+           
+            sql = sql & " j Int = 0; " & "\n"
+            sql = sql & " contador Int = 0; " & "\n"
+            sql = sql & " bandera varchar; " & "\n"
+            sql = sql & " sumapar numeric = 0; " & "\n"
+            sql = sql & " sumaimpar numeric = 0; " & "\n"
+            sql = sql & " impar numeric = 0; " & "\n"
+            sql = sql & " impar1 integer = 0; " & "\n"
+            sql = sql & " impar2 integer = 0; " & "\n"
+            sql = sql & " imparchar varchar; " & "\n" & "\n"
+           
+            sql = sql & " cod varchar(1); " & "\n"
+            sql = sql & " cod2 varchar(1); " & "\n"
+            sql = sql & " suma integer; " & "\n" & "\n"
+           
+            sql = sql & " dni integer; " & "\n"
+            sql = sql & " Cif integer[]; " & "\n"
+            sql = sql & " numero integer[]; " & "\n"
+            sql = sql & " nif1 varchar(10); " & "\n"
+            sql = sql & " nif varchar(9); " & "\n" & "\n"
+            sql = sql & " BEGIN " & "\n"
+            sql = sql & " cod = substr(Upper($1), 1, 1); " & "\n"
+            sql = sql & " cod2 = substr(Upper($1), 9, 1); " & "\n" & "\n"
+            sql = sql & "--vamos a ver si es un nie" & "\n"
+            sql = sql & "   IF cod ~ '[XxYyZz]'  THEN " & "\n"
+            sql = sql & "       IF cod = 'X' THEN " & "\n"
+            sql = sql & "        nif = '0'||substr($1, 2,9); " & "\n"
+            sql = sql & "       END IF; " & "\n"
+            sql = sql & "       IF cod = 'Y' THEN " & "\n"
+            sql = sql & "         nif = '1'||substr($1, 2,9); " & "\n"
+            sql = sql & "       END IF; " & "\n"
+            sql = sql & "       IF cod = 'Z' THEN " & "\n"
+            sql = sql & "         nif = '2'||substr($1, 2,9); " & "\n"
+            sql = sql & "      END IF; " & "\n"
+            sql = sql & "      dni = substr(nif, 0, 9); " & "\n"
+            sql = sql & "      nif1 = substr(nif, 0, 9); " & "\n" & "\n"
+           
+            sql = sql & "       nif1 = nif1 || SUBSTRING('TRWAGMYFPDXBNJZSQVHLCKE', dni % 23 + 1, 1); " & "\n"
+            sql = sql & "       nif1 = substr(nif1, 2, 9); " & "\n"
+            sql = sql & "      nif1 = cod || nif1; " & "\n"
+            sql = sql & "       IF nif1 = Upper($1) THEN " & "\n"
+            sql = sql & "         RETURN TRUE; " & "\n"
+            sql = sql & "       ELSE " & "\n"
+            sql = sql & "         RETURN FALSE; " & "\n"
+            sql = sql & "       END IF ; " & "\n"
+            sql = sql & "   END IF ; " & "\n" & "\n"
+           
+            sql = sql & "--si no es nie ¿será nif?" & "\n"
+            sql = sql & "   IF cod ~ '[0-9]'  THEN " & "\n"
+            sql = sql & "       IF char_length($1) = 8 THEN " & "\n"
+            sql = sql & "         nif = '0' || $1; " & "\n"
+            sql = sql & "       ELSE " & "\n"
+            sql = sql & "         nif = $1; " & "\n"
+            sql = sql & "       END IF ; " & "\n"
+            sql = sql & "       dni = substr(nif, 0, 9); " & "\n"
+            sql = sql & "       nif1 = substr(nif, 0, 9); " & "\n"
+            sql = sql & "       nif1 = nif1 || SUBSTRING('TRWAGMYFPDXBNJZSQVHLCKE', dni % 23 + 1, 1); " & "\n" & "\n"
+           
+            sql = sql & "       IF nif1 = Upper(nif) THEN " & "\n"
+            sql = sql & "         RETURN TRUE; " & "\n"
+            sql = sql & "       ELSE " & "\n"
+            sql = sql & "         RETURN FALSE ; " & "\n"
+            sql = sql & "       END IF ; " & "\n"
+            sql = sql & "   END IF ; " & "\n" & "\n"
+           
+            sql = sql & "--si no es nie ni nif veamos si es cif" & "\n"
+            sql = sql & "   IF cod2 ~ '[a-zA-Z]'  then " & "\n"
+            sql = sql & "     contador = char_length($1); " & "\n"
+            sql = sql & "     Cif = '{}'; " & "\n"
+            sql = sql & "     FOR j IN 1..contador - 2 LOOP " & "\n"
+            sql = sql & "       Cif[j] = substr($1, j + 1, 1); " & "\n"
+            sql = sql & "     END LOOP ; " & "\n" & "\n"
+           
+            sql = sql & "   ELSE " & "\n"
+            sql = sql & "     contador = char_length($1); " & "\n"
+            sql = sql & "     Cif = '{}'; " & "\n"
+            sql = sql & "     FOR j IN 1..contador - 1 LOOP " & "\n"
+            sql = sql & "       Cif[j] = substr($1, j + 1, 1); " & "\n"
+            sql = sql & "     END LOOP ; " & "\n"
+            sql = sql & "   END IF ; " & "\n" & "\n"
+            
+            sql = sql & "     IF $1 ~ '[a-zA-Z]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[a-zA-Z0-9]' then " & "\n"
+            sql = sql & "       SELECT " & "\n"
+            sql = sql & "       CASE WHEN cod = 'A' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'B' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'C' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'D' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'E' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'F' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'G' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'H' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'J' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'K' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'L' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'M' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'N' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'P' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'Q' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'R' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'S' THEN 'letra' " & "\n"
+            sql = sql & "         WHEN cod = 'U' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'V' THEN 'codigo' " & "\n"
+            sql = sql & "         WHEN cod = 'W' THEN 'letra' " & "\n"
+            sql = sql & "       ELSE '' " & "\n"
+            sql = sql & "       END " & "\n"
+            sql = sql & "       INTO bandera; " & "\n" & "\n"
+           
+            sql = sql & "       sumapar = Cif[2] + Cif[4] + Cif[6]; " & "\n"
+            sql = sql & "         impar = Cif[1] * 2; " & "\n"
+            sql = sql & "         imparchar = impar; " & "\n"
+            sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+            sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+            sql = sql & "         ELSE " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "         END IF ; " & "\n"
+            sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+            sql = sql & "         impar1 = 0; " & "\n"
+            sql = sql & "         impar2 = 0; " & "\n"
+            sql = sql & "         impar = Cif[3] * 2; " & "\n"
+            sql = sql & "         imparchar = impar; " & "\n"
+            sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+            sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+            sql = sql & "         ELSE " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "         END IF ; " & "\n"
+            sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+            sql = sql & "         impar1 = 0; " & "\n"
+            sql = sql & "         impar2 = 0; " & "\n" & "\n"
+           
+            sql = sql & "         impar = Cif[5] * 2; " & "\n"
+            sql = sql & "         imparchar = impar; " & "\n"
+            sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+            sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+            sql = sql & "         ELSE " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "         END IF ; " & "\n"
+            sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+            sql = sql & "         impar1 = 0; " & "\n"
+            sql = sql & "         impar2 = 0; " & "\n" & "\n"
+            
+            sql = sql & "         impar = Cif[7] * 2; " & "\n"
+            sql = sql & "         imparchar = impar; " & "\n"
+            sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+            sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+            sql = sql & "         ELSE " & "\n"
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+            sql = sql & "         END IF ; " & "\n"
+            sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+            sql = sql & "         impar1 = 0; " & "\n"
+            sql = sql & "         impar2 = 0; " & "\n" & "\n"
+           
+            sql = sql & "       sumapar = sumapar + sumaimpar; " & "\n"
+            sql = sql & "       imparchar = sumapar; --para reutilizar mVarglobales y forzar a String" & "\n"
+            sql = sql & "         IF char_length(imparchar) > 1 THEN "
+            sql = sql & "           impar1 = substr(imparchar, 2, 1); --cogemos solo las unidades" & "\n"
+            sql = sql & "         ELSE "
+            sql = sql & "           impar1 = substr(imparchar, 1, 1); --cogemos solo las unidades" & "\n"
+            sql = sql & "         END IF ; "
+            sql = sql & "       sumapar = 10 - impar1; "
+            sql = sql & "       impar1 = sumapar; --para reutilizar mVarglobales y forzar " & "\n"
+            sql = sql & "       IF bandera = 'letra' then " & "\n"
+            sql = sql & "         imparchar = SUBSTRING( 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', impar1, 1); " & "\n"
+            sql = sql & "       ELSE "
+            sql = sql & "         imparchar = sumapar; --para reutilizar mVarglobales y forzar a String " & "\n"
+            sql = sql & "       END IF ; " & "\n" & "\n"
+            sql = sql & "       IF char_length(imparchar) > 1 THEN   imparchar = substr(imparchar, 2, 1); END IF; --cogemos solo las unidades " & "\n"
+            sql = sql & "       IF imparchar = cod2 THEN " & "\n"
+            sql = sql & "         RETURN TRUE; " & "\n"
+            sql = sql & "       ELSE " & "\n"
+            sql = sql & "         RETURN FALSE; " & "\n"
+            sql = sql & "       END IF ; " & "\n"
+            sql = sql & "     ELSE " & "\n"
+            sql = sql & "       RETURN FALSE; " & "\n"
+            sql = sql & "     END IF ; " & "\n" & "\n"
+           
+            sql = sql & " EXCEPTION " & "\n"
+            sql = sql & " WHEN OTHERS THEN " & "\n"
+            sql = sql & "   RETURN FALSE; " & "\n" & "\n"
+            
+            sql = sql & " END ; $BODY$ " & "\n"
+            sql = sql & "   LANGUAGE 'plpgsql' VOLATILE " & "\n"
+            sql = sql & "   COST 100; " & "\n"
+            error_carga = (("No se ha podido crear la función compruebacif revisa la sentencia SQL"))
+            C.DbConn.Exec(sql)
+            
+            
+            sql = "DROP DOMAIN if exists Tcif CASCADE "
+            C.DbConn.Exec(sql)
+            sql = "CREATE DOMAIN Tcif AS CHARACTER(9) "
+            sql = sql & "CONSTRAINT cif_valido CHECK(compruebacif(VALUE));"
+            error_carga = (mConstantes.inf_error_0001)
+            C.DbConn.Exec(sql)
+            
+            
+            sql = "DROP DOMAIN if exists Ttelefono CASCADE "
+            C.DbConn.Exec(sql)
+            sql = "CREATE DOMAIN Ttelefono AS CHARACTER(13) "
+            sql = sql & "CONSTRAINT Ttelefono_valido CHECK(VALUE ~ '[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]');"
+            error_carga = (mConstantes.inf_error_0001)
+            C.DbConn.Exec(sql)
+            
+            
+            sql = "DROP DOMAIN if exists Testado CASCADE  "
+            C.DbConn.Exec(sql)
+            sql = "CREATE DOMAIN Testado AS CHARACTER(1) "
+            sql = sql & "CONSTRAINT Testado_valido CHECK(value in ('Y','N'));"
+            error_carga = (mConstantes.inf_error_0001)
+            C.DbConn.Exec(sql)
+
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+
+            sql = "DROP FUNCTION if exists  compruebacorreo(text) CASCADE"
+            C.DbConn.Exec(sql)
+            sql = "  CREATE OR Replace FUNCTION compruebacorreo(text) "
+            sql = sql & "  RETURNS boolean AS " & "\n"
+            sql = sql & "  $BODY$ DECLARE " & "\n"
+            sql = sql & "/********************************************************************************************************" & "\n"
+            sql = sql & "  * The contents OF this file are subject TO the GPL V.3" & "\n"
+            sql = sql & "  * The Original Code IS TPV - ERP." & "\n"
+            sql = sql & "  * All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+            sql = sql & "  * All Rights Reserved." & "\n" & "\n"
+            sql = sql & "  SELECT compruebacorreo( 'd@jorge.net');" & "\n"
+            sql = sql & "  Retorna OK si hay coincidencia" & "\n"
+            sql = sql & "  Retorna ERROR_0001 formato de e-mail erroneo" & "\n"
+            sql = sql & "********************************************************************************************************/" & "\n"
+            sql = sql & "  BEGIN " & "\n"
+            sql = sql & "    IF $1 ~ '.+@.+[.]+[a-zA-Z]+$' then  " & "\n"
+            sql = sql & "      RETURN TRUE; " & "\n"
+            sql = sql & "    ELSE " & "\n"
+            sql = sql & "        IF $1 IS NULL then  " & "\n"
+            sql = sql & "          RETURN TRUE; " & "\n"
+            sql = sql & "        ELSE " & "\n"
+            sql = sql & "         RETURN FALSE; " & "\n"
+            sql = sql & "        END IF; " & "\n"
+            sql = sql & "      RETURN FALSE; " & "\n"
+            sql = sql & "    END IF; " & "\n"
+            sql = sql & "  EXCEPTION WHEN OTHERS THEN" & "\n"
+            sql = sql & "     RETURN FALSE;" & "\n"
+            sql = sql & "  END ; $BODY$ " & "\n"
+            sql = sql & "    LANGUAGE 'plpgsql' VOLATILE " & "\n"
+            sql = sql & "    COST 100; "
+            error_carga = (("No se ha podido crear la función compruebacorreo revisa la sentencia SQL"))
+            C.DbConn.Exec(sql)
+           
+           
+            sql = "DROP DOMAIN if exists Temail CASCADE"
+            C.DbConn.Exec(sql)
+            sql = "CREATE DOMAIN Temail AS VARCHAR(50) "
+            sql = sql & "CONSTRAINT Temail_valido CHECK(compruebacorreo(VALUE));"
+            error_carga = (mConstantes.inf_error_0001)
+            C.DbConn.Exec(sql)
+           
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+                 
+            sql = "DROP TABLE if exists " & mInstalar.BD_PREFI & "empresas CASCADE"
+            C.DbConn.Exec(sql)
+             sql = "CREATE TABLE " & mInstalar.BD_PREFI & "empresas("
+             sql = sql & "id_empresa serial NOT NULL,"
+             sql = sql & "codigo varchar(10) NOT NULL,"
+             sql = sql & "cif Tcif NOT NULL,"
+             sql = sql & "nombre varchar(50) NOT NULL,"
+             sql = sql & "direccion varchar(50) DEFAULT NULL,"
+             sql = sql & "poblacion varchar(50) DEFAULT NULL,"
+             sql = sql & "provincia varchar(50) DEFAULT NULL,"
+             sql = sql & "cpostal varchar(6) DEFAULT NULL," 
+             sql = sql & "phone Ttelefono DEFAULT NULL,"
+             sql = sql & "phone2 Ttelefono DEFAULT NULL,"
+             sql = sql & "fax Ttelefono DEFAULT NULL,"
+             sql = sql & "email Temail DEFAULT 'ND@nd.es',"
+             sql = sql & "web varchar(50) DEFAULT NULL,"
+             sql = sql & "logotipo varchar(255),"
+             sql = sql & "registro varchar(255),"
+             sql = sql & "servidor varchar(255),"
+             sql = sql & "puerto varchar(6),"
+             sql = sql & "usuariobd varchar(50),"
+             sql = sql & "passbd varchar(10),"
+             sql = sql & "basemadre varchar(30),"
+             sql = sql & "vinculada Testado NOT NULL DEFAULT 'N',"
+             sql = sql & "seriet varchar(5),"
+             sql = sql & "serief varchar(5),"
+             sql = sql & "niniprepago numeric(10),"
+             sql = sql & "niniticket numeric(10),"
+             sql = sql & "ninifactura numeric(10),"
+             sql = sql & "ninicredito numeric(10),"
+             sql = sql & "niniarqueo numeric(10),"
+             sql = sql & "cprecio Testado NOT NULL DEFAULT 'N',"
+             sql = sql & "ivadesglose Testado NOT NULL DEFAULT 'Y',"
+             sql = sql & "identifica Testado NOT NULL DEFAULT 'Y',"
+             sql = sql & "tiempo numeric(10) DEFAULT '150',"
+             sql = sql & "delete_e Testado NOT NULL DEFAULT 'N',"
+             sql = sql & "created_e timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "createdby_e decimal(10, 0),"
+             sql = sql & "updated_e timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "updatedby_e decimal(10, 0),"
+             sql = sql & "CONSTRAINT empresas_pkey PRIMARY KEY (id_empresa),"
+             sql = sql & "CONSTRAINT empresas_codigo_pkey UNIQUE (codigo)"
+             sql = sql & ")"
+             error_carga = (mConstantes.inf_error_0005)
+             C.DbConn.Exec(sql)
+             respaldo(mInstalar.BD_PREFI & "empresas", "id_empresa", "updatedby_e")
+             respaldo_borrar(mInstalar.BD_PREFI & "empresas", "id_empresa", "updatedby_e")
+           
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+           
+            sql = "DROP FUNCTION if exists alta_empresa(text[]) CASCADE"
+            C.DbConn.Exec(sql)
+             sql = "  CREATE OR Replace FUNCTION alta_empresa(text[]) "
+             sql = sql & " RETURNS text AS " & "\n"
+             sql = sql & " $BODY$ DECLARE " & "\n"
+             sql = sql & "/********************************************************************************************************" & "\n"
+             sql = sql & " * The contents OF this file are subject TO the GPL V.3" & "\n"
+             sql = sql & " * The Original Code IS TPV - ERP." & "\n"
+             sql = sql & " * All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+             sql = sql & " * All Rights Reserved." & "\n"
+             sql = sql & "  Retorna OK si el alta se ha efectuado con éxito" & "\n"
+             sql = sql & "********************************************************************************************************/" & "\n"
+             sql = sql & " valores ALIAS FOR $1; " & "\n"
+             sql = sql & " result RECORD; " & "\n"
+             sql = sql & " creado Integer; " & "\n"
+             sql = sql & " updatado Integer; " & "\n"
+             sql = sql & " BEGIN " & "\n"
+             sql = sql & "   creado = valores[19]; " & "\n"
+             sql = sql & "   updatado = valores[20]; " & "\n"
+             sql = sql & "                insert into " & mInstalar.BD_PREFI & "empresas(codigo,cif,nombre,direccion,poblacion,provincia,cpostal,phone,phone2,fax,email,web,logotipo,registro,servidor,puerto,usuariobd,passbd,createdby_e,updatedby_e)"
+             sql = sql & "                                                       values(valores[1], valores[2], valores[3], valores[4], valores[5], valores[6], valores[7], valores[8], valores[9], valores[10], valores[11], valores[12], valores[13], valores[14], valores[15], valores[16], valores[17], valores[18],creado, updatado); " & "\n"
+             sql = sql & "                RETURN 'OK';" & "\n"
+             sql = sql & "  EXCEPTION WHEN OTHERS THEN" & "\n"
+             sql = sql & "     RETURN SQLERRM;" & "\n"
+             sql = sql & "   END ; $BODY$ " & "\n"
+             sql = sql & "     LANGUAGE 'plpgsql' VOLATILE; " & "\n"
+             error_carga = (("No se ha podido crear la función alta_empresa revisa la sentencia SQL"))
+             C.DbConn.Exec(sql)
+           
+             sql = "select alta_empresa('{000000,29104440X,TPV-ERP,ND,ND,ND,ND,999999999,999999999,999999999,nd@nd.net,ND,0,0,0,0,0,0,0,0}')"
+             error_carga = (("No se ha podido añadir la empresa revisa la sentencia SQL"))
+             C.DbConn.Exec(sql)
+           
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+             
+            sql = "DROP TABLE if exists " & mInstalar.BD_PREFI & "perfiles CASCADE"
+            C.DbConn.Exec(sql)
+             sql = "CREATE TABLE " & mInstalar.BD_PREFI & "perfiles ("
+             sql = sql & "id_perfil serial NOT NULL,"
+             sql = sql & "perfilname varchar(60) NOT NULL,"
+             sql = sql & "diretoatpv boolean DEFAULT false,"
+             sql = sql & "configuracion boolean DEFAULT true,"
+             sql = sql & "empresas boolean DEFAULT true,"
+                   sql = sql & "empresa_nuevo boolean DEFAULT true,"
+                   sql = sql & "empresa_zoom boolean DEFAULT true,"
+                   sql = sql & "empresa_editar boolean DEFAULT true,"
+                   sql = sql & "empresa_seleccionar boolean DEFAULT true,"
+                   sql = sql & "empresa_borrar boolean DEFAULT true,"
+             sql = sql & "agentes boolean DEFAULT false,"
+                    sql = sql & "agentes_nuevo boolean DEFAULT true,"
+                    sql = sql & "agentes_zoom boolean DEFAULT true,"
+                    sql = sql & "agentes_editar boolean DEFAULT true,"
+                    sql = sql & "agentes_borrar boolean DEFAULT true,"
+             sql = sql & "empleados boolean DEFAULT true,"
+                    sql = sql & "empleados_nuevo boolean DEFAULT true,"
+                    sql = sql & "empleados_zoom boolean DEFAULT true,"
+                    sql = sql & "empleados_editar boolean DEFAULT true,"
+                    sql = sql & "empleados_borrar boolean DEFAULT true,"
+             sql = sql & "almacenes boolean DEFAULT false,"
+                    sql = sql & "almacenes_nuevo boolean DEFAULT true,"
+                    sql = sql & "almacenes_zoom boolean DEFAULT true,"
+                    sql = sql & "almacenes_editar boolean DEFAULT true,"
+                    sql = sql & "almacenes_borrar boolean DEFAULT true,"
+             sql = sql & "divisas boolean DEFAULT true,"
+             sql = sql & "bancos boolean DEFAULT true,"
+             sql = sql & "iva boolean DEFAULT true,"
+                   sql = sql & "iva_nuevo boolean DEFAULT true,"
+                   sql = sql & "iva_zoom boolean DEFAULT true,"
+                   sql = sql & "iva_editar boolean DEFAULT true,"
+                   sql = sql & "iva_borrar boolean DEFAULT true,"
+             sql = sql & "fpagos boolean DEFAULT true,"
+                   sql = sql & "pago_nuevo boolean DEFAULT true,"
+                   sql = sql & "pago_zoom boolean DEFAULT true,"
+                   sql = sql & "pago_editar boolean DEFAULT true,"
+                   sql = sql & "pago_borrar boolean DEFAULT true,"
+             sql = sql & "Fcobro boolean DEFAULT true,"
+                   sql = sql & "cobro_nuevo boolean DEFAULT true,"
+                   sql = sql & "cobro_zoom boolean DEFAULT true,"
+                   sql = sql & "cobro_editar boolean DEFAULT true,"
+                   sql = sql & "cobro_borrar boolean DEFAULT true,"
+                   sql = sql & "prepago_nuevo boolean DEFAULT true,"
+                   sql = sql & "prepago_zoom boolean DEFAULT true,"
+                   sql = sql & "prepago_editar boolean DEFAULT false,"
+                   sql = sql & "prepago_borrar boolean DEFAULT false,"
+             sql = sql & "familias boolean DEFAULT true,"
+                   sql = sql & "familia_nuevo boolean DEFAULT true,"
+                   sql = sql & "familia_zoom boolean DEFAULT true,"
+                   sql = sql & "familia_editar boolean DEFAULT true,"
+                   sql = sql & "familia_borrar boolean DEFAULT true,"
+             sql = sql & "propiedades boolean DEFAULT true,"
+             sql = sql & "llamadas boolean DEFAULT true,"
+             sql = sql & "mapa boolean DEFAULT true,"
+             sql = sql & "rappel boolean DEFAULT true,"
+             sql = sql & "parametrizacion boolean DEFAULT true,"
+             sql = sql & "comedores boolean DEFAULT true,"
+                   sql = sql & "comedor_nuevo boolean DEFAULT true,"
+                   sql = sql & "comedor_zoom boolean DEFAULT true,"
+                   sql = sql & "comedor_editar boolean DEFAULT true,"
+                   sql = sql & "comedor_borrar boolean DEFAULT true,"
+             sql = sql & "mesas boolean DEFAULT true,"
+                   sql = sql & "mesa_nuevo boolean DEFAULT true,"
+                   sql = sql & "mesa_zoom boolean DEFAULT true,"
+                   sql = sql & "mesa_editar boolean DEFAULT true,"
+                   sql = sql & "mesa_borrar boolean DEFAULT true,"       
+             sql = sql & "maestros boolean DEFAULT true,"
+             sql = sql & "articulos boolean DEFAULT true,"
+                   sql = sql & "articulos_nuevo boolean DEFAULT true,"
+                   sql = sql & "articulos_zoom boolean DEFAULT true,"
+                   sql = sql & "articulos_editar boolean DEFAULT true,"
+                   sql = sql & "articulos_buscar boolean DEFAULT true,"
+                   sql = sql & "articulos_borrar boolean DEFAULT true,"
+             sql = sql & "clientes boolean DEFAULT true,"
+                    sql = sql & "cliente_nuevo boolean DEFAULT true,"
+                    sql = sql & "cliente_zoom boolean DEFAULT true,"
+                    sql = sql & "cliente_editar boolean DEFAULT true,"
+                    sql = sql & "cliente_buscar boolean DEFAULT true,"
+                    sql = sql & "cliente_borrar boolean DEFAULT true,"
+             sql = sql & "proveedores boolean DEFAULT true,"
+                    sql = sql & "proveedores_nuevo boolean DEFAULT true,"
+                    sql = sql & "proveedores_zoom boolean DEFAULT true,"
+                    sql = sql & "proveedores_editar boolean DEFAULT true,"
+                    sql = sql & "proveedores_buscar boolean DEFAULT true,"
+                    sql = sql & "proveedores_borrar boolean DEFAULT true,"
+             sql = sql & "transportistas boolean DEFAULT true,"
+             sql = sql & "Compras boolean DEFAULT true,"
+             sql = sql & "tarifas_p boolean DEFAULT true,"
+             sql = sql & "pedidos_p boolean DEFAULT true,"
+             sql = sql & "recepcion_p boolean DEFAULT true,"
+             sql = sql & "devolucion_p boolean DEFAULT true,"
+             sql = sql & "albaranes_p boolean DEFAULT true,"
+             sql = sql & "facturas_p boolean DEFAULT true,"
+             sql = sql & "informes_p boolean DEFAULT true,"
+             sql = sql & "ventas_c boolean DEFAULT true,"
+                     sql = sql & "tarifas_c boolean DEFAULT true,"
+                            sql = sql & "tarifasc_nuevo boolean DEFAULT true,"
+                            sql = sql & "tarifasc_zoom boolean DEFAULT true,"
+                            sql = sql & "tarifasc_editar boolean DEFAULT true,"
+                            sql = sql & "tarifasc_buscar boolean DEFAULT true,"
+                            sql = sql & "tarifasc_borrar boolean DEFAULT true,"
+             sql = sql & "presupuesto_c boolean DEFAULT true,"
+             sql = sql & "pedidos_c boolean DEFAULT true,"
+             sql = sql & "albaranes_c boolean DEFAULT true,"
+             sql = sql & "entregas_c boolean DEFAULT true,"
+             sql = sql & "muestras_c boolean DEFAULT true,"
+             sql = sql & "facturas_c boolean DEFAULT true,"
+             sql = sql & "devolucines_c boolean DEFAULT true,"
+             sql = sql & "abonos_c boolean DEFAULT true,"
+             sql = sql & "tpv boolean DEFAULT true,"
+                   sql = sql & "ftpv_cobros boolean DEFAULT true,"
+                   sql = sql & "ftpv_pagos boolean DEFAULT true,"
+                   sql = sql & "ftpv_mto boolean DEFAULT true,"
+                   sql = sql & "ftpv_cajon boolean DEFAULT true,"
+                   sql = sql & "ftpv_imprimir boolean DEFAULT true,"
+                   sql = sql & "ftpv_borrarlinea boolean DEFAULT true,"
+                   sql = sql & "ftpv_ccreditos boolean DEFAULT true,"
+                   sql = sql & "ftpv_historial boolean DEFAULT false,"
+                         sql = sql & "ftpv_historial_fecha boolean DEFAULT false,"
+                         sql = sql & "ftpv_historial_imprimir boolean DEFAULT false,"
+             sql = sql & "ftpv_totaliza boolean DEFAULT true,"
+             sql = sql & "ftpv_editticket boolean DEFAULT false,"
+             sql = sql & "fraticket boolean DEFAULT true,"
+                   sql = sql & "fraticket_nuevo boolean DEFAULT true,"
+                   sql = sql & "fraticket_zoom boolean DEFAULT true,"
+                   sql = sql & "fraticket_buscar boolean DEFAULT true,"
+                   sql = sql & "fraticket_borrar boolean DEFAULT true,"
+             sql = sql & "informe_c boolean DEFAULT true,"
+             sql = sql & "pagos_p boolean DEFAULT true,"
+             sql = sql & "cobros boolean DEFAULT true,"
+             sql = sql & "utilidades boolean DEFAULT true,"
+             sql = sql & "perfiles boolean DEFAULT true,"
+                   sql = sql & "perfil_nuevo boolean DEFAULT false,"
+                   sql = sql & "perfil_zoom boolean DEFAULT true,"
+                   sql = sql & "perfil_editar boolean DEFAULT true,"
+                   sql = sql & "perfil_borrar boolean DEFAULT false,"
+             sql = sql & "created_p timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "createdby_p numeric(10) NOT NULL,"
+             sql = sql & "updated_p timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "updatedby_p numeric(10) NOT NULL,"
+             sql = sql & "CONSTRAINT perfiles_pkey PRIMARY KEY(id_perfil),"
+             sql = sql & "CONSTRAINT perfiles_name_key UNIQUE(perfilname)"
+             sql = sql & ")"
+             error_carga = (mConstantes.inf_error_0004)
+             C.DbConn.Exec(sql)
+             respaldo(mInstalar.BD_PREFI & "perfiles ", " id_perfil ", " updatedby_p")
+
+
+                query = "INSERT INTO " & mInstalar.BD_PREFI & "perfiles(perfilname, diretoatpv, configuracion, empresas, empresa_nuevo, empresa_zoom, empresa_editar, empresa_seleccionar, empresa_borrar, agentes, agentes_nuevo, agentes_zoom, agentes_editar, agentes_borrar, empleados, empleados_nuevo, empleados_zoom, empleados_editar, empleados_borrar, almacenes, almacenes_nuevo, almacenes_zoom, almacenes_editar, almacenes_borrar, divisas, bancos, iva, iva_nuevo, iva_zoom, iva_editar, iva_borrar, fpagos, pago_nuevo, pago_zoom, pago_editar, pago_borrar, fcobro, cobro_nuevo, cobro_zoom, cobro_editar, cobro_borrar, prepago_nuevo, prepago_zoom, prepago_editar, prepago_borrar, familias, familia_nuevo, familia_zoom, familia_editar, familia_borrar, propiedades, llamadas, mapa, rappel, parametrizacion, maestros, articulos, articulos_nuevo, articulos_zoom, articulos_editar, articulos_buscar, articulos_borrar, clientes, cliente_nuevo, cliente_zoom, cliente_editar, cliente_buscar, cliente_borrar, proveedores, proveedores_nuevo, proveedores_zoom, proveedores_editar, proveedores_buscar"
+                query &= ", proveedores_borrar, transportistas, compras, tarifas_p, pedidos_p, recepcion_p, devolucion_p, albaranes_p, facturas_p, informes_p, ventas_c, tarifas_c, tarifasc_nuevo, tarifasc_zoom, tarifasc_editar, tarifasc_buscar, tarifasc_borrar, presupuesto_c, pedidos_c, albaranes_c, entregas_c, muestras_c, facturas_c, devolucines_c, abonos_c, tpv, ftpv_cobros, ftpv_pagos, ftpv_mto, ftpv_cajon, ftpv_imprimir, ftpv_borrarlinea, ftpv_ccreditos, ftpv_historial, ftpv_historial_fecha, ftpv_historial_imprimir, ftpv_totaliza, ftpv_editticket, fraticket, fraticket_nuevo, fraticket_zoom, fraticket_buscar, fraticket_borrar, informe_c, pagos_p, cobros, utilidades, perfiles, perfil_nuevo, perfil_zoom, perfil_editar, perfil_borrar, createdby_p, updatedby_p)"
+                hFile = Open Application.path & "/csv/permisos.csv" For Input
+                While Not Eof(hFile)
+                  Line Input #hFile, sLine
+                  sline = mFuncionesg.fueracoma(sLine)
+                  If sLine <> "" Then 
+                    sql = query & "VALUES(" & meteysaca(sLine) & ")" 
+                    C.DbConn.Exec(sql)
+                  Endif 
+                Wend
+                hFile.Close
+
+
+            sql = "DROP TABLE if exists " & mInstalar.BD_PREFI & "usuarios CASCADE"
+            C.DbConn.Exec(sql)
+             sql = "CREATE TABLE " & mInstalar.BD_PREFI & "usuarios ("
+             sql = sql & "id_usuario serial NOT NULL,"
+             sql = sql & "username varchar(60) NOT NULL,"
+             sql = sql & "password varchar(100),"
+             sql = sql & "rol int2 NOT NULL DEFAULT 0,"
+             sql = sql & "cont_int int2 DEFAULT 0,"
+             sql = sql & "id_empresa integer DEFAULT 0,"
+             sql = sql & "date_password Date NOT NULL DEFAULT  Now(),"
+             sql = sql & "firstname character varying(60),"
+             sql = sql & "lastname character varying(60),"
+             sql = sql & "dni Tcif NOT NULL,"
+             sql = sql & "adress character varying(80),"
+             sql = sql & "poblacion character varying(80),"
+             sql = sql & "provincia character varying(80),"
+             sql = sql & "cpostal character varying(6),"
+             sql = sql & "email Temail,"
+             sql = sql & "phone Ttelefono,"
+             sql = sql & "fax Ttelefono,"
+             sql = sql & "delete_u Testado NOT NULL DEFAULT 'N',"
+             sql = sql & "isactive_u Testado NOT NULL DEFAULT 'Y',"
+             sql = sql & "isblocked Testado NOT NULL DEFAULT 'N',"
+             sql = sql & "created_u timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "createdby_u numeric(10) NOT NULL,"
+             sql = sql & "updated_u timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "updatedby_u numeric(10) NOT NULL,"
+             sql = sql & "CONSTRAINT usuarios_pkey PRIMARY KEY(id_usuario),"
+             sql = sql & "CONSTRAINT usuarios_fkey FOREIGN KEY(id_empresa) REFERENCES  " & mInstalar.BD_PREFI & "empresas(id_empresa) ON UPDATE CASCADE ON DELETE NO ACTION,"
+             sql = sql & "CONSTRAINT usuarios_username_key UNIQUE(username)"
+             sql = sql & ")"
+             error_carga = (mConstantes.inf_error_0004)
+             C.DbConn.Exec(sql)
+             respaldo(mInstalar.BD_PREFI & "usuarios", " id_usuario ", " updatedby_u ")
+             respaldo_borrar(mInstalar.BD_PREFI & "usuarios", "id_usuario", "updatedby_u")
+           
+           
+            sql = "DROP FUNCTION  if exists alta_usuario(text[]) CASCADE"
+            C.DbConn.Exec(sql)
+            sql = "  CREATE OR Replace FUNCTION alta_usuario(text[]) "
+            sql = sql & " RETURNS text AS " & "\n"
+            sql = sql & " $BODY$ DECLARE " & "\n"
+            sql = sql & "/********************************************************************************************************" & "\n"
+            sql = sql & " * The contents OF this file are subject TO the GPL V.3" & "\n"
+            sql = sql & " * The Original Code IS TPV - ERP." & "\n"
+            sql = sql & " * All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+            sql = sql & " * All Rights Reserved." & "\n"
+            sql = sql & "  Retorna OK si el alta se ha efectuado con éxito" & "\n"
+            sql = sql & "  Retorna ERROR_0030 Existe otra persona con este NIF" & "\n"
+            sql = sql & "  Retorna ERROR_AU01 Error en la función alta_usuarios" & "\n"
+            sql = sql & "  Retorna ERROR_9999 Los parámetros de entrada no tienen el tipo adecuado" & "\n"
+            sql = sql & "********************************************************************************************************/" & "\n"
+            sql = sql & " valores ALIAS FOR $1; " & "\n"
+            sql = sql & " result RECORD; " & "\n"
+            sql = sql & " creado Integer; " & "\n"
+            sql = sql & " updatado Integer; " & "\n"
+            sql = sql & " dnio varchar; " & "\n"
+            sql = sql & " rolo Integer; " & "\n"
+            sql = sql & " empre Integer; " & "\n"
+            sql = sql & " BEGIN " & "\n"
+            sql = sql & "   creado = valores[15]; " & "\n"
+            sql = sql & "   updatado = valores[16]; " & "\n"
+            sql = sql & "   dnio = Upper(valores[7]); " & "\n"
+            sql = sql & "   rolo = valores[3]; " & "\n"
+            sql = sql & "   empre = valores[4]; " & "\n"
+            sql = sql & "      SELECT INTO result count(*) as numero  FROM " & mInstalar.BD_PREFI & "usuarios WHERE dni = dnio and delete_u='N'; " & "\n"
+            sql = sql & "      IF result.numero=0 THEN " & "\n"
+            sql = sql & "             SELECT INTO result count(*) as numero  FROM " & mInstalar.BD_PREFI & "usuarios WHERE dni = dnio; " & "\n"
+            sql = sql & "             IF result.numero=0 THEN " & "\n"
+            sql = sql & "                insert into " & mInstalar.BD_PREFI & "usuarios(username,password,rol,id_empresa,firstname,lastname,dni,adress,poblacion,provincia,cpostal,email,phone,fax, createdby_u, updatedby_u)values(valores[1],valores[2],rolo,empre,valores[5],valores[6], dnio, valores[8], valores[9], valores[10],valores[11],valores[12],valores[13],valores[14],creado,updatado);" & "\n"
+            sql = sql & "                RETURN 'OK';" & "\n"
+            sql = sql & "             ELSE " & "\n"
+            sql = sql & "                RETURN 'ERROR_AU01';" & "\n"
+            sql = sql & "             END IF ; " & "\n"
+            sql = sql & "      ELSE " & "\n"
+            sql = sql & "        RETURN 'ERROR_0030';" & "\n"
+            sql = sql & "      END IF ; " & "\n"
+            sql = sql & "  EXCEPTION WHEN OTHERS THEN" & "\n"
+            sql = sql & "     RETURN  SQLERRM;" & "\n"
+            sql = sql & "   END ; $BODY$ " & "\n"
+            sql = sql & "     LANGUAGE 'plpgsql' VOLATILE; " & "\n"
+            error_carga = (("No se ha podido crear la función alta_persona revisa la sentencia SQL"))
+            C.DbConn.Exec(sql)
+           
+            pass = Crypt.MD5(sDatos[7], mConstantes.md5)
+            sql = "select alta_usuario('{" & sDatos[6] & "," & pass & ",1,1,administrador,administrador,29104440X,ND,ND,ND,ND,nd@nd.net,999999999,999999999,0,0}')"
+            error_carga = (("No se ha podido añadir la persona administradora revisa la sentencia SQL"))
+            C.DbConn.Exec(sql)
+
+
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+
+            sql = "DROP TABLE if exists " & mInstalar.BD_PREFI & "registro_entradas CASCADE"
+            C.DbConn.Exec(sql)
+
+
+             sql = "CREATE TABLE " & mInstalar.BD_PREFI & "registro_entradas ("
+             sql = sql & "id_registro serial NOT NULL,"
+             sql = sql & "id_username int2 NOT NULL,"
+             sql = sql & "tipo char(1) NOT NULL DEFAULT 'E',"
+             sql = sql & "host varchar(255),"
+             sql = sql & "usuariopc varchar(255),"
+             sql = sql & "exito Testado NOT NULL DEFAULT 'N',"
+             sql = sql & "fecha_entrada timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "CONSTRAINT registro_entradas_pkey PRIMARY KEY(id_registro),"
+             sql = sql & "CONSTRAINT registro_entradas_fkey FOREIGN KEY(id_username) REFERENCES  " & mInstalar.BD_PREFI & "usuarios(id_usuario)ON UPDATE CASCADE ON DELETE NO ACTION"
+             sql = sql & ")"
+             error_carga = (mConstantes.inf_error_0007)
+             C.DbConn.Exec(sql)
+           
+            
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+                 
+                 
+            sql = "DROP FUNCTION if exists valida_usuario(text[], text[]) CASCADE"
+            C.DbConn.Exec(sql)
+           
+            sql = " CREATE OR Replace FUNCTION valida_usuario(text[], text[]) "
+            sql = sql & "RETURNS character varying AS " & "\n"
+            sql = sql & "$BODY$ DECLARE " & "\n"
+            sql = sql & "/********************************************************************************************************" & "\n"
+            sql = sql & "* The contents OF this file are subject TO the GPL V.3 " & "\n"
+            sql = sql & "* The Original Code IS TPV -ERP. " & "\n"
+            sql = sql & "* All portions are Copyright(C)2008 - 2010 JORGE MARTIN AZNAR " & "\n"
+            sql = sql & "* All Rights Reserved. " & "\n" & "\n"
+            sql = sql & "  Parámetos de entrada: " & "\n"
+            sql = sql & "   1. -array con los datos ordenados username y password " & "\n"
+            sql = sql & "   2. -Texto con host " & "\n"
+            sql = sql & "  Retorna PASA si hay exito" & "\n"
+            sql = sql & "  Retorna ERROR_0019 si el usuario está bloqueado" & "\n"
+            sql = sql & "  Retorna ERROR_0018 si el usuario no está activo" & "\n"
+            sql = sql & "  Retorna ERROR_0017 si La persona está bloqueada" & "\n"
+            sql = sql & "  Retorna ERROR_0016 Este usuario a quedado bloqueado" & "\n"
+            sql = sql & "  Retorna ERROR_0015 Error de usuario o contraseña" & "\n"
+             sql = sql & " Retorna los errores de la función anidada fregistro_entradas" & "\n"
+            sql = sql & "********************************************************************************************************/" & "\n"
+            sql = sql & "result RECORD; " & "\n"
+            sql = sql & "contador Int; " & "\n"
+            sql = sql & "valores ALIAS FOR $1 ; " & "\n"
+            sql = sql & "valores2 ALIAS FOR $2 ; " & "\n"
+            sql = sql & "resul1 varchar(10); " & "\n"
+            sql = sql & "id Int; " & "\n"
+            sql = sql & "BEGIN " & "\n"
+            sql = sql & "contador = 0; " & "\n"
+            sql = sql & "SELECT INTO result * FROM " & mInstalar.BD_PREFI & "usuarios WHERE username = valores[1] AND password = valores[2] AND  delete_u = 'N'; " "" & "\n"
+            sql = sql & "   IF result.username = valores[1] THEN " & "\n"
+            sql = sql & "   id = result.id_usuario; " & "\n"
+            sql = sql & "     IF (result.isactive_u = 'Y') then " & "\n"
+            sql = sql & "       IF (result.isblocked = 'Y') then " & "\n"
+            sql = sql & "         resul1 =  fregistro_entradas(valores2,'EN', id); " & "\n"
+            sql = sql & "         RETURN 'ERROR_0019'; " & "\n"
+            sql = sql & "       ELSE " & "\n"
+            sql = sql & "         IF (result.isactive_u = 'Y') then " & "\n"
+            sql = sql & "             resul1 =  fregistro_entradas(valores2,'EY', id); " & "\n"
+            sql = sql & "               IF (resul1 = 'OK') then " & "\n"
+            sql = sql & "                   update " & mInstalar.BD_PREFI & "usuarios set cont_int = 0 WHERE username = valores[1]; " & "\n"
+            sql = sql & "                   RETURN 'PASA'; " & "\n"
+            sql = sql & "               ELSE " & "\n"
+            sql = sql & "                   RETURN resul1; " & "\n"
+            sql = sql & "              END IF ; " & "\n"
+            sql = sql & "         ELSE " & "\n"
+            sql = sql & "           resul1 =  fregistro_entradas(valores2,'EN', id); " & "\n"
+            sql = sql & "           RETURN 'ERROR_0018'; " & "\n"
+            sql = sql & "         END IF ; " & "\n"
+            sql = sql & "       END IF ; " & "\n"
+            sql = sql & "     ELSE " & "\n"
+            sql = sql & "           resul1 =  fregistro_entradas(valores2,'EN', id); " & "\n"
+            sql = sql & "       RETURN 'ERROR_0017'; " & "\n"
+            sql = sql & "     END IF ; " & "\n"
+            sql = sql & "   ELSE " & "\n"
+            sql = sql & "     SELECT INTO result * FROM " & mInstalar.BD_PREFI & "usuarios WHERE username = valores[1] AND delete_u = 'N'; " & "\n"
+            sql = sql & "     id = result.id_usuario; " & "\n"
+            sql = sql & "     IF (result.cont_int < 3) THEN " & "\n"
+            sql = sql & "       contador = result.cont_int + 1; " & "\n"
+            sql = sql & "       update " & mInstalar.BD_PREFI & "usuarios set cont_int = contador WHERE username = valores[1]; " & "\n"
+            sql = sql & "     ELSE " & "\n"
+            sql = sql & "       IF (result.cont_int = 3) THEN " & "\n"
+            sql = sql & "       update " & mInstalar.BD_PREFI & "usuarios set isblocked = 'Y' WHERE username=valores[1]; " & "\n"
+            sql = sql & "       RETURN 'ERROR_0016'; " & "\n"
+            sql = sql & "       END IF ; " & "\n"
+            sql = sql & "     END IF ; " & "\n"
+            sql = sql & "     SELECT INTO result * FROM " & mInstalar.BD_PREFI & "usuarios WHERE username = valores[1]; " & "\n"
+            sql = sql & "     IF result.username = valores[1] THEN " & "\n"
+            sql = sql & "       id = result.id_usuario; " & "\n"
+            sql = sql & "       resul1 =  fregistro_entradas(valores2,'EN', id); " & "\n"
+            sql = sql & "     END IF ; " & "\n"
+            sql = sql & "     RETURN 'ERROR_0015'; " & "\n"
+            sql = sql & "   END IF ; " & "\n"
+            sql = sql & "  EXCEPTION WHEN OTHERS THEN" & "\n"
+            sql = sql & "     RETURN  SQLERRM;" & "\n"
+            sql = sql & "END ; $BODY$ " & "\n"
+            sql = sql & "  LANGUAGE 'plpgsql' VOLATILE "
+            error_carga = (("No se ha podido crear la función valida_usuario revisa la sentencia SQL"))
+            C.DbConn.Exec(sql)
+           
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+           
+            sql = "DROP FUNCTION if exists fregistro_entradas(text[], varchar(2), integer) CASCADE"
+            C.DbConn.Exec(sql)
+            sql = "  CREATE OR Replace FUNCTION fregistro_entradas(text[], varchar(2), integer) "
+            sql = sql & " RETURNS text AS "
+            sql = sql & " $BODY$ DECLARE "
+            sql = sql & "/********************************************************************************************************" & "\n"
+            sql = sql & "* The contents OF this file are subject TO the GPL V.3" & "\n"
+            sql = sql & "* The Original Code IS TPV - ERP." & "\n"
+            sql = sql & "* All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+            sql = sql & "* All Rights Reserved." & "\n" & "\n"
+            sql = sql & "  Parámetos de entrada: " & "\n"
+            sql = sql & "   1. -array con los datos ordenados username y host " & "\n"
+            sql = sql & "   2. -cadena con dos caracteres ordenados: el primero indica si entra E o sale S, el segundo carácter indica si se ha logueado con éxito o no S o N " & "\n"
+            sql = sql & "  Retorna OK si hay exito" & "\n"
+            sql = sql & "  Retorna ERROR_0020 si se produce algún error" & "\n"
+            sql = sql & "********************************************************************************************************/" & "\n"
+            sql = sql & " valores ALIAS FOR $1 ; " & "\n"
+            sql = sql & " codE varchar(1); " & "\n"
+            sql = sql & " codEx varchar(1); " & "\n"
+            sql = sql & " user Integer; " & "\n"
+            sql = sql & " BEGIN " & "\n"
+            sql = sql & " codE = substr(Upper($2), 1, 1); " & "\n"
+            sql = sql & " codEx = substr(Upper($2), 2, 1); " & "\n" & "\n"
+            sql = sql & "   user = $3; " & "\n"
+            sql = sql & "   insert into " & mInstalar.BD_PREFI & "registro_entradas(id_username, host, usuariopc, tipo, exito, fecha_entrada)values(user, valores[2], valores[1], codE, codEx, Now());" & "\n"
+            sql = sql & "   RETURN 'OK'; " & "\n"
+            sql = sql & "  EXCEPTION WHEN OTHERS THEN" & "\n"
+            sql = sql & "   RETURN SQLERRM;" & "\n"
+            sql = sql & " END ; $BODY$ " & "\n"
+            sql = sql & " LANGUAGE 'plpgsql' VOLATILE; " & "\n"
+            error_carga = (("No se ha podido crear la función FUNCTION registro_entradas revisa la sentencia SQL"))
+            C.DbConn.Exec(sql)
+           
+           
+           
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+           
+            sql = "DROP FUNCTION if exists datos_usuario(text) CASCADE"
+            C.DbConn.Exec(sql)
+            sql = "  CREATE OR Replace FUNCTION datos_usuario(text) "
+            sql = sql & " RETURNS text[] AS "
+            sql = sql & " $BODY$ DECLARE "
+            sql = sql & "/********************************************************************************************************" & "\n"
+            sql = sql & "* The contents OF this file are subject TO the GPL V.3" & "\n"
+            sql = sql & "* The Original Code IS TPV - ERP." & "\n"
+            sql = sql & "* All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+            sql = sql & "* All Rights Reserved." & "\n" & "\n"
+            sql = sql & "  Parámetos de entrada: " & "\n"
+            sql = sql & "   1. -array con los datos ordenados username y host " & "\n"
+            sql = sql & "   2. -cadena con dos caracteres ordenados: el primero indica si entra E o sale S, el segundo carácter indica si se ha logueado con éxito o no S o N " & "\n"
+            sql = sql & "  Retorna OK si hay exito" & "\n"
+            sql = sql & "  Retorna ERROR_0020 si se produce algún error" & "\n"
+            sql = sql & "********************************************************************************************************/" & "\n"
+            sql = sql & " valores ALIAS FOR $1 ; " & "\n"
+            sql = sql & " result RECORD; " & "\n"
+            sql = sql & " BEGIN " & "\n"
+            sql = sql & "     SELECT INTO result id_usuario, username FROM " & mInstalar.BD_PREFI & "usuarios WHERE username = valores AND delete_u = 'N'; " & "\n"
+            sql = sql & "       RETURN result; " & "\n"
+            sql = sql & " END ; $BODY$ " & "\n"
+            sql = sql & " LANGUAGE 'plpgsql' VOLATILE; " & "\n"
+            error_carga = (("No se ha podido crear la función FUNCTION datos_usuario revisa la sentencia SQL"))
+            C.DbConn.Exec(sql)
+           
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+
+            sql = "DROP TABLE if exists " & mInstalar.BD_PREFI & "parametriza CASCADE"
+            C.DbConn.Exec(sql)
+             sql = "CREATE TABLE " & mInstalar.BD_PREFI & "parametriza("
+             sql = sql & "id_parametro serial NOT NULL,"
+             sql = sql & "impr_ticket varchar(50) NOT NULL,"
+             sql = sql & "created_pa timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "createdby_pa decimal(10, 0) NOT NULL,"
+             sql = sql & "updated_pa timestamp NOT NULL DEFAULT Now(),"
+             sql = sql & "updatedby_pa decimal(10, 0) NOT NULL,"
+             sql = sql & "CONSTRAINT parametriza_pkey PRIMARY KEY (id_parametro)"
+             sql = sql & ")"
+             C.DbConn.Exec(sql)
+           
+             sql = "insert into " & mInstalar.BD_PREFI & "parametriza(impr_ticket, createdby_pa, updatedby_pa)values('/dev/ttyS0:9600:cs8:-parenb:-echo:-F', 1, 1)"
+             error_carga = (mConstantes.inf_error_0004)
+             C.DbConn.Exec(sql)
+           
+           
+           
+           
+             C.DbConn.Commit
+            
+                 ProgressBar1.Value = ProgressBar1.Value + porcen
+                 ProgressBar1.Refresh
+                 Wait 0.01
+            
+             Return True
+ Endif
+ Finally
+ Catch
+ Message.Error(Error.Text)
+ Message.Error(error_carga)
+  Return False
+End
+
+
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'/////////////////////TABLAS PARA EMPRESAS CONCRETAS /////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+'////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+Public Function crea_empresa(bd As CPostgres) As Boolean
+  Dim sql As String
+  Dim error_carga As String
+  
+  
+  bd.DbConn.Begin
+
+  sql = "drop language if exists plpgsql cascade"
+  error_carga = (mConstantes.inf_error_0001)
+  Try bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE TRUSTED LANGUAGE plpgsql HANDLER language_handler_in"
+  error_carga = (mConstantes.inf_error_0001)
+  bd.DbConn.Exec(sql)
+  
+  
+  sql = "SET TIME ZONE 'Europe/Rome'"
+  error_carga = (mConstantes.inf_error_0002)
+  bd.DbConn.Exec(sql)
+
+
+
+  sql = "  CREATE OR Replace FUNCTION compruebacif(text) "
+  sql = sql & " RETURNS BOOLEAN AS "
+  sql = sql & " $BODY$ DECLARE "
+  sql = sql & "/********************************************************************************************************" & "\n"
+  sql = sql & "* The contents OF this file are subject TO the GPL V.3" & "\n"
+  sql = sql & "* The Original Code IS TPV - ERP." & "\n"
+  sql = sql & "* All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+  sql = sql & "* All Rights Reserved." & "\n" & "\n"
+  sql = sql & "Retorna TRUE si hay coincidencia" & "\n"
+  sql = sql & "Retorna FALSE si no hay coincidencia en nie" & "\n"
+  sql = sql & "********************************************************************************************************/" & "\n"
+ 
+  sql = sql & " j Int = 0; " & "\n"
+  sql = sql & " contador Int = 0; " & "\n"
+  sql = sql & " bandera varchar; " & "\n"
+  sql = sql & " sumapar numeric = 0; " & "\n"
+  sql = sql & " sumaimpar numeric = 0; " & "\n"
+  sql = sql & " impar numeric = 0; " & "\n"
+  sql = sql & " impar1 integer = 0; " & "\n"
+  sql = sql & " impar2 integer = 0; " & "\n"
+  sql = sql & " imparchar varchar; " & "\n" & "\n"
+ 
+  sql = sql & " cod varchar(1); " & "\n"
+  sql = sql & " cod2 varchar(1); " & "\n"
+  sql = sql & " suma integer; " & "\n" & "\n"
+ 
+  sql = sql & " dni integer; " & "\n"
+  sql = sql & " Cif integer[]; " & "\n"
+  sql = sql & " numero integer[]; " & "\n"
+  sql = sql & " nif1 varchar(10); " & "\n"
+  sql = sql & " nif varchar(9); " & "\n" & "\n"
+  sql = sql & " BEGIN " & "\n"
+  sql = sql & " cod = substr(Upper($1), 1, 1); " & "\n"
+  sql = sql & " cod2 = substr(Upper($1), 9, 1); " & "\n" & "\n"
+  sql = sql & "--vamos a ver si es un nie" & "\n"
+  sql = sql & "   IF cod ~ '[XxYyZz]'  THEN " & "\n"
+  sql = sql & "       IF cod = 'X' THEN " & "\n"
+  sql = sql & "        nif = '0'||substr($1, 2,9); " & "\n"
+  sql = sql & "       END IF; " & "\n"
+  sql = sql & "       IF cod = 'Y' THEN " & "\n"
+  sql = sql & "         nif = '1'||substr($1, 2,9); " & "\n"
+  sql = sql & "       END IF; " & "\n"
+  sql = sql & "       IF cod = 'Z' THEN " & "\n"
+  sql = sql & "         nif = '2'||substr($1, 2,9); " & "\n"
+  sql = sql & "      END IF; " & "\n"
+  sql = sql & "      dni = substr(nif, 0, 9); " & "\n"
+  sql = sql & "      nif1 = substr(nif, 0, 9); " & "\n" & "\n"
+ 
+  sql = sql & "       nif1 = nif1 || SUBSTRING('TRWAGMYFPDXBNJZSQVHLCKE', dni % 23 + 1, 1); " & "\n"
+  sql = sql & "       nif1 = substr(nif1, 2, 9); " & "\n"
+  sql = sql & "      nif1 = cod || nif1; " & "\n"
+  sql = sql & "       IF nif1 = Upper($1) THEN " & "\n"
+  sql = sql & "         RETURN TRUE; " & "\n"
+  sql = sql & "       ELSE " & "\n"
+  sql = sql & "         RETURN FALSE; " & "\n"
+  sql = sql & "       END IF ; " & "\n"
+  sql = sql & "   END IF ; " & "\n" & "\n"
+ 
+  sql = sql & "--si no es nie ¿será nif?" & "\n"
+  sql = sql & "   IF cod ~ '[0-9]'  THEN " & "\n"
+  sql = sql & "       IF char_length($1) = 8 THEN " & "\n"
+  sql = sql & "         nif = '0' || $1; " & "\n"
+  sql = sql & "       ELSE " & "\n"
+  sql = sql & "         nif = $1; " & "\n"
+  sql = sql & "       END IF ; " & "\n"
+  sql = sql & "       dni = substr(nif, 0, 9); " & "\n"
+  sql = sql & "       nif1 = substr(nif, 0, 9); " & "\n"
+  sql = sql & "       nif1 = nif1 || SUBSTRING('TRWAGMYFPDXBNJZSQVHLCKE', dni % 23 + 1, 1); " & "\n" & "\n"
+ 
+  sql = sql & "       IF nif1 = Upper(nif) THEN " & "\n"
+  sql = sql & "         RETURN TRUE; " & "\n"
+  sql = sql & "       ELSE " & "\n"
+  sql = sql & "         RETURN FALSE ; " & "\n"
+  sql = sql & "       END IF ; " & "\n"
+  sql = sql & "   END IF ; " & "\n" & "\n"
+ 
+  sql = sql & "--si no es nie ni nif veamos si es cif" & "\n"
+  sql = sql & "   IF cod2 ~ '[a-zA-Z]'  then " & "\n"
+  sql = sql & "     contador = char_length($1); " & "\n"
+  sql = sql & "     Cif = '{}'; " & "\n"
+  sql = sql & "     FOR j IN 1..contador - 2 LOOP " & "\n"
+  sql = sql & "       Cif[j] = substr($1, j + 1, 1); " & "\n"
+  sql = sql & "     END LOOP ; " & "\n" & "\n"
+ 
+  sql = sql & "   ELSE " & "\n"
+  sql = sql & "     contador = char_length($1); " & "\n"
+  sql = sql & "     Cif = '{}'; " & "\n"
+  sql = sql & "     FOR j IN 1..contador - 1 LOOP " & "\n"
+  sql = sql & "       Cif[j] = substr($1, j + 1, 1); " & "\n"
+  sql = sql & "     END LOOP ; " & "\n"
+  sql = sql & "   END IF ; " & "\n" & "\n"
+  
+  sql = sql & "     IF $1 ~ '[a-zA-Z]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[a-zA-Z0-9]' then " & "\n"
+  sql = sql & "       SELECT " & "\n"
+  sql = sql & "       CASE WHEN cod = 'A' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'B' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'C' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'D' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'E' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'F' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'G' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'H' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'J' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'K' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'L' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'M' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'N' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'P' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'Q' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'R' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'S' THEN 'letra' " & "\n"
+  sql = sql & "         WHEN cod = 'U' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'V' THEN 'codigo' " & "\n"
+  sql = sql & "         WHEN cod = 'W' THEN 'letra' " & "\n"
+  sql = sql & "       ELSE '' " & "\n"
+  sql = sql & "       END " & "\n"
+  sql = sql & "       INTO bandera; " & "\n" & "\n"
+ 
+  sql = sql & "       sumapar = Cif[2] + Cif[4] + Cif[6]; " & "\n"
+  sql = sql & "         impar = Cif[1] * 2; " & "\n"
+  sql = sql & "         imparchar = impar; " & "\n"
+  sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+  sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+  sql = sql & "         ELSE " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "         END IF ; " & "\n"
+  sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+  sql = sql & "         impar1 = 0; " & "\n"
+  sql = sql & "         impar2 = 0; " & "\n"
+  sql = sql & "         impar = Cif[3] * 2; " & "\n"
+  sql = sql & "         imparchar = impar; " & "\n"
+  sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+  sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+  sql = sql & "         ELSE " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "         END IF ; " & "\n"
+  sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+  sql = sql & "         impar1 = 0; " & "\n"
+  sql = sql & "         impar2 = 0; " & "\n" & "\n"
+ 
+  sql = sql & "         impar = Cif[5] * 2; " & "\n"
+  sql = sql & "         imparchar = impar; " & "\n"
+  sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+  sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+  sql = sql & "         ELSE " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "         END IF ; " & "\n"
+  sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+  sql = sql & "         impar1 = 0; " & "\n"
+  sql = sql & "         impar2 = 0; " & "\n" & "\n"
+  
+  sql = sql & "         impar = Cif[7] * 2; " & "\n"
+  sql = sql & "         imparchar = impar; " & "\n"
+  sql = sql & "         IF char_length(imparchar) > 1 THEN " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "           impar2 = substr(imparchar, 2, 1); " & "\n"
+  sql = sql & "           impar1 = impar1 + impar2; " & "\n"
+  sql = sql & "         ELSE " & "\n"
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); " & "\n"
+  sql = sql & "         END IF ; " & "\n"
+  sql = sql & "         sumaimpar = sumaimpar + impar1; " & "\n"
+  sql = sql & "         impar1 = 0; " & "\n"
+  sql = sql & "         impar2 = 0; " & "\n" & "\n"
+ 
+  sql = sql & "       sumapar = sumapar + sumaimpar; " & "\n"
+  sql = sql & "       imparchar = sumapar; --para reutilizar mVarglobales y forzar a String" & "\n"
+  sql = sql & "         IF char_length(imparchar) > 1 THEN "
+  sql = sql & "           impar1 = substr(imparchar, 2, 1); --cogemos solo las unidades" & "\n"
+  sql = sql & "         ELSE "
+  sql = sql & "           impar1 = substr(imparchar, 1, 1); --cogemos solo las unidades" & "\n"
+  sql = sql & "         END IF ; "
+  sql = sql & "       sumapar = 10 - impar1; "
+  sql = sql & "       impar1 = sumapar; --para reutilizar mVarglobales y forzar " & "\n"
+  sql = sql & "       IF bandera = 'letra' then " & "\n"
+  sql = sql & "         imparchar = SUBSTRING( 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', impar1, 1); " & "\n"
+  sql = sql & "       ELSE "
+  sql = sql & "         imparchar = sumapar; --para reutilizar mVarglobales y forzar a String " & "\n"
+  sql = sql & "       END IF ; " & "\n" & "\n"
+  sql = sql & "       IF char_length(imparchar) > 1 THEN   imparchar = substr(imparchar, 2, 1); END IF; --cogemos solo las unidades " & "\n"
+  sql = sql & "       IF imparchar = cod2 THEN " & "\n"
+  sql = sql & "         RETURN TRUE; " & "\n"
+  sql = sql & "       ELSE " & "\n"
+  sql = sql & "         RETURN FALSE; " & "\n"
+  sql = sql & "       END IF ; " & "\n"
+  sql = sql & "     ELSE " & "\n"
+  sql = sql & "       RETURN FALSE; " & "\n"
+  sql = sql & "     END IF ; " & "\n" & "\n"
+ 
+  sql = sql & " EXCEPTION " & "\n"
+  sql = sql & " WHEN OTHERS THEN " & "\n"
+  sql = sql & "   RETURN FALSE; " & "\n" & "\n"
+  
+  sql = sql & " END ; $BODY$ " & "\n"
+  sql = sql & "   LANGUAGE 'plpgsql' VOLATILE " & "\n"
+  sql = sql & "   COST 100; " & "\n"
+  error_carga = (("No se ha podido crear la función compruebacif revisa la sentencia SQL"))
+  bd.DbConn.Exec(sql)
+  
+  sql = "  CREATE OR Replace FUNCTION compruebacorreo(text) "
+  sql = sql & "  RETURNS boolean AS " & "\n"
+  sql = sql & "  $BODY$ DECLARE " & "\n"
+  sql = sql & "/********************************************************************************************************" & "\n"
+  sql = sql & "  * The contents OF this file are subject TO the GPL V.3" & "\n"
+  sql = sql & "  * The Original Code IS TPV - ERP." & "\n"
+  sql = sql & "  * All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+  sql = sql & "  * All Rights Reserved." & "\n" & "\n"
+  sql = sql & "  SELECT compruebacorreo( 'd@jorge.net');" & "\n"
+  sql = sql & "  Retorna OK si hay coincidencia" & "\n"
+  sql = sql & "  Retorna ERROR_0001 formato de e-mail erroneo" & "\n"
+  sql = sql & "********************************************************************************************************/" & "\n"
+  sql = sql & "  BEGIN " & "\n"
+  sql = sql & "    IF $1 ~ '.+@.+[.]+[a-zA-Z]+$' then  " & "\n"
+  sql = sql & "      RETURN TRUE; " & "\n"
+  sql = sql & "    ELSE " & "\n"
+  sql = sql & "        IF $1 IS NULL then  " & "\n"
+  sql = sql & "          RETURN TRUE; " & "\n"
+  sql = sql & "        ELSE " & "\n"
+  sql = sql & "         RETURN FALSE; " & "\n"
+  sql = sql & "        END IF; " & "\n"
+  sql = sql & "      RETURN FALSE; " & "\n"
+  sql = sql & "    END IF; " & "\n"
+  sql = sql & "  EXCEPTION WHEN OTHERS THEN" & "\n"
+  sql = sql & "     RETURN FALSE;" & "\n"
+  sql = sql & "  END ; $BODY$ " & "\n"
+  sql = sql & "    LANGUAGE 'plpgsql' VOLATILE " & "\n"
+  sql = sql & "    COST 100; "
+  error_carga = (("No se ha podido crear la función compruebacorreo revisa la sentencia SQL"))
+  bd.DbConn.Exec(sql)
+ 
+  sql = "CREATE DOMAIN Temail AS VARCHAR(50) "
+  sql = sql & "CONSTRAINT Temail_valido CHECK(compruebacorreo(VALUE));"
+  error_carga = (mConstantes.inf_error_0001)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE DOMAIN Tcif AS CHARACTER(9) "
+  sql = sql & "CONSTRAINT cif_valido CHECK(compruebacif(VALUE));"
+  error_carga = (mConstantes.inf_error_0001)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE DOMAIN Ttelefono AS CHARACTER(13) "
+  sql = sql & "CONSTRAINT Ttelefono_valido CHECK(VALUE ~ '[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]+[0-9]');"
+  error_carga = (mConstantes.inf_error_0001)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE DOMAIN Testado AS CHARACTER(1) "
+  sql = sql & "CONSTRAINT Testado_valido CHECK(value in ('Y','N'));"
+  error_carga = (mConstantes.inf_error_0001)
+  bd.DbConn.Exec(sql)
+  
+  
+  'Va Sin prefijo porque si no seria imposible adivinarlo
+  sql = "CREATE TABLE dbmadre("
+  sql = sql & "id_dbmadre serial NOT NULL,"
+  sql = sql & "created timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "dbname varchar(60),"
+  sql = sql & "prefijo varchar(10),"
+  sql = sql & "CONSTRAINT dbmadre_pkey PRIMARY KEY(id_dbmadre)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0003)
+  bd.DbConn.Exec(sql)
+  
+  sql = "INSERT INTO dbmadre (dbname,prefijo) VALUES ('" & mVarglobales.sBaseMadre & "','" & mVarglobales.sPrefijoTerminal & "')"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  
+  
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "historial("
+  sql = sql & "id_historial serial NOT NULL,"
+  sql = sql & "created timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby numeric(10) DEFAULT 0,"
+  sql = sql & "tabla varchar(60),"
+  sql = sql & "campo varchar(60),"
+  sql = sql & "id numeric(10) NOT NULL,"
+  sql = sql & "oldvalue text,"
+  sql = sql & "newvalue text,"
+  sql = sql & "CONSTRAINT historial1_pkey PRIMARY KEY(id_historial)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0003)
+  bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "comedores("
+  sql = sql & "id_comedor serial NOT NULL,"
+  sql = sql & "nombre varchar(50) NOT NULL,"
+  sql = sql & "imagenc varchar(500),"
+  sql = sql & "created_com timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_com decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_com timestamp,"
+  sql = sql & "updatedby_com decimal(10, 0),"
+  sql = sql & "CONSTRAINT comedores_pkey PRIMARY KEY (id_comedor)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "comedores", " id_comedor ", " updatedby_com ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "comedores", " id_comedor ", " updatedby_com ", bd)
+ 
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "mesasmo("
+  sql = sql & "id_mesamo serial NOT NULL,"
+  sql = sql & "idcomedor integer NOT NULL,"
+  sql = sql & "numero integer NOT NULL,"
+  sql = sql & "tipo integer DEFAULT 0,"
+  sql = sql & "timpresion integer DEFAULT 0,"
+  sql = sql & "x integer DEFAULT 0,"
+  sql = sql & "y integer DEFAULT 0,"
+  sql = sql & "created_me timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_me decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_me timestamp,"
+  sql = sql & "updatedby_me decimal(10, 0),"
+  sql = sql & "CONSTRAINT mesasmo_pkey PRIMARY KEY (id_mesamo),"
+  sql = sql & "CONSTRAINT mesasmo_fkey FOREIGN KEY(idcomedor) REFERENCES  " & mVarglobales.sPrefijoTerminal & "comedores(id_comedor) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "mesasmo", " id_mesamo ", " updatedby_me ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "mesasmo", " id_mesamo ", " updatedby_me ", bd)
+ 
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "iva("
+  sql = sql & "id_iva serial NOT NULL,"
+  sql = sql & "codigo varchar(10) NOT NULL,"
+  sql = sql & "descripcion varchar(50) NOT NULL,"
+  sql = sql & "iva numeric  NOT NULL,"
+  sql = sql & "recargo numeric  NOT NULL,"
+  sql = sql & "delete_i Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_i timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_i decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_i timestamp,"
+  sql = sql & "updatedby_i decimal(10, 0),"
+  sql = sql & "CONSTRAINT iva_pkey PRIMARY KEY (id_iva)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "iva", " id_iva ", " updatedby_i ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "iva", " id_iva ", " updatedby_i ", bd)
+ 
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "clientes("
+  sql = sql & "id_cliente serial NOT NULL,"
+  sql = sql & "nombre_cl varchar(50) NOT NULL,"
+  sql = sql & "cif Tcif NOT NULL,"
+  sql = sql & "direccion varchar(50) DEFAULT 'N.D.',"
+  sql = sql & "poblacion varchar(50) DEFAULT 'N.D.',"
+  sql = sql & "provincia varchar(50) DEFAULT 'N.D.',"
+  sql = sql & "cpostal varchar(6) DEFAULT 'N.D.',"
+  sql = sql & "phone Ttelefono DEFAULT NULL,"
+  sql = sql & "phone2 Ttelefono DEFAULT NULL,"
+  sql = sql & "fax Ttelefono DEFAULT NULL,"
+  sql = sql & "email Temail DEFAULT 'ND@nd.es',"
+  sql = sql & "web varchar(50) DEFAULT 'N.D.',"
+  sql = sql & "tpv Testado NOT NULL DEFAULT 'Y',"
+  sql = sql & "idagente integer DEFAULT 0,"
+  sql = sql & "idformacobro_cl integer DEFAULT 0,"
+  sql = sql & "delete_cl Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_cl timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_cl decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_cl timestamp,"
+  sql = sql & "updatedby_cl decimal(10, 0),"
+  sql = sql & "CONSTRAINT cliente_pkey PRIMARY KEY (id_cliente)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "clientes", " id_cliente ", " updatedby_cl ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "clientes", " id_cliente ", " updatedby_cl ", bd)
+ 
+ 
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "direcciones_cl("
+  sql = sql & "id_direccion serial NOT NULL,"
+  sql = sql & "idcliente integer NOT NULL,"
+  sql = sql & "numdireccion integer NOT NULL,"
+  sql = sql & "nombre_dicl varchar(50) NOT NULL,"
+  sql = sql & "direccion varchar(50) DEFAULT 'N.D.',"
+  sql = sql & "poblacion varchar(50) DEFAULT 'N.D.',"
+  sql = sql & "provincia varchar(50) DEFAULT 'N.D.',"
+  sql = sql & "cpostal varchar(6) DEFAULT 'N.D.',"
+  sql = sql & "phone Ttelefono DEFAULT NULL,"
+  sql = sql & "phone2 Ttelefono DEFAULT NULL,"
+  sql = sql & "fax Ttelefono DEFAULT NULL,"
+  sql = sql & "email Temail DEFAULT 'ND@nd.es',"
+  sql = sql & "delete_dicl Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_dicl timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_dicl decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_dicl timestamp,"
+  sql = sql & "updatedby_dicl decimal(10, 0),"
+  sql = sql & "CONSTRAINT direcciones_cl_pkey PRIMARY KEY (id_direccion),"
+  sql = sql & "CONSTRAINT direcciones_cl_fkey FOREIGN KEY(idcliente) REFERENCES  " & mVarglobales.sPrefijoTerminal & "clientes(id_cliente) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+ 
+  
+ 
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "familias("
+  sql = sql & "id_familia serial NOT NULL,"
+  sql = sql & "codigo varchar(10) NOT NULL,"
+  sql = sql & "descripcion varchar(50) NOT NULL,"
+  sql = sql & "garantia Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "lote Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "caducidad Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "anada Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "cbarras varchar(2) NOT NULL DEFAULT '00',"
+  sql = sql & "ordenf integer DEFAULT 0,"
+  sql = sql & "tpv Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "preparacion Testado DEFAULT 'N',"
+  sql = sql & "condimento Testado DEFAULT 'N',"
+  sql = sql & "imagen varchar(250),"
+  sql = sql & "delete_f Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_f timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_f decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_f timestamp,"
+  sql = sql & "updatedby_f decimal(10, 0),"
+  sql = sql & "CONSTRAINT familia_pkey PRIMARY KEY (id_familia)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "familias", " id_familia ", " updatedby_f ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "familias", " id_familia ", " updatedby_f ", bd)
+
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "articulos("
+  sql = sql & "id_articulo serial NOT NULL,"
+  sql = sql & "codigo_a varchar(10) NOT NULL,"
+  sql = sql & "descripcion_a varchar(50) NOT NULL,"
+  sql = sql & "idfamilia integer NOT NULL,"
+  sql = sql & "cbarras_a text,"
+  sql = sql & "tipocbarras varchar(10),"
+  sql = sql & "imagena varchar(500),"
+  sql = sql & "tipoart integer NOT NULL DEFAULT 1,"
+  sql = sql & "peso Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "idivacompra integer NOT NULL,"
+  sql = sql & "idivaresta integer NOT NULL,"
+  sql = sql & "tpva Testado NOT NULL DEFAULT 'Y',"
+  sql = sql & "tienda Testado DEFAULT 'N',"
+  sql = sql & "pideprecio Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "pidepeso Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "ordena integer DEFAULT 0,"
+  sql = sql & "pvfijo Testado NOT NULL DEFAULT 'Y',"
+  sql = sql & "importepvfijo numeric DEFAULT 0,"
+  sql = sql & "pvporcen Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "pvpcantiporcen numeric DEFAULT 0,"
+  sql = sql & "pvcalculado numeric DEFAULT 0,"
+  sql = sql & "pvresta numeric DEFAULT 0,"
+  sql = sql & "delete_a Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_a timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_a decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_a timestamp,"
+  sql = sql & "updatedby_a decimal(10, 0),"
+  sql = sql & "CONSTRAINT farticulo_pkey PRIMARY KEY (id_articulo),"
+  sql = sql & "CONSTRAINT articulo1_fkey FOREIGN KEY(idfamilia) REFERENCES  " & mVarglobales.sPrefijoTerminal & "familias(id_familia) ON UPDATE CASCADE ON DELETE NO ACTION,"
+  sql = sql & "CONSTRAINT articulo2_fkey FOREIGN KEY(idivacompra) REFERENCES  " & mVarglobales.sPrefijoTerminal & "iva(id_iva) ON UPDATE CASCADE ON DELETE NO ACTION,"
+  sql = sql & "CONSTRAINT articulo3_fkey FOREIGN KEY(idivaresta) REFERENCES  " & mVarglobales.sPrefijoTerminal & "iva(id_iva) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "articulos", " id_articulo ", " updatedby_a ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "articulos", " id_articulo ", " updatedby_a ", bd)
+ 
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "tarifas_c("
+  sql = sql & "id_tarifa serial NOT NULL,"
+  sql = sql & "descripcion varchar(50) NOT NULL,"
+  sql = sql & "descuentog numeric DEFAULT 0,"
+  sql = sql & "fecha_begin date NOT NULL,"
+  sql = sql & "fecha_end date NOT NULL,"
+  sql = sql & "delete_tc Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_tc timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_tc decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_tc timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_tc decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT tarifas_c_pkey PRIMARY KEY (id_tarifa)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "tarifas_c", " id_tarifa ", " updatedby_tc  ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "tarifas_c", " id_tarifa ", " updatedby_tc  ", bd)
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "diario_tarifas_c("
+  sql = sql & "id_diario serial NOT NULL,"
+  sql = sql & "idtarifa integer NOT NULL,"
+  sql = sql & "idarticulo integer NOT NULL,"
+  sql = sql & "precio_dc numeric DEFAULT 0,"
+  sql = sql & "descuento numeric DEFAULT 0,"
+  sql = sql & "delete_dc Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_dc timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_dc decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_dc timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_dc decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT diario_pkey PRIMARY KEY (id_diario),"
+  sql = sql & "CONSTRAINT diario1_fkey FOREIGN KEY(idtarifa) REFERENCES  " & mVarglobales.sPrefijoTerminal & "tarifas_c(id_tarifa) ON UPDATE CASCADE ON DELETE NO ACTION,"
+  sql = sql & "CONSTRAINT diario2_fkey FOREIGN KEY(idarticulo) REFERENCES  " & mVarglobales.sPrefijoTerminal & "articulos(id_articulo) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "diario_tarifas_c", " id_diario ", " updatedby_dc  ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "diario_tarifas_c", " id_diario ", " updatedby_dc ", bd)
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "clientes_t("
+  sql = sql & "id_clientes_t serial NOT NULL,"
+  sql = sql & "idtarifas integer NOT NULL,"
+  sql = sql & "idclientes integer NOT NULL,"
+  sql = sql & "delete_t Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_t timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_t decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_t timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_t decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT id_clientes_t_pkey PRIMARY KEY (id_clientes_t),"
+  sql = sql & "CONSTRAINT clientes_t_fkey FOREIGN KEY(idtarifas) REFERENCES  " & mVarglobales.sPrefijoTerminal & "tarifas_c(id_tarifa) ON UPDATE CASCADE ON DELETE NO ACTION,"
+  sql = sql & "CONSTRAINT clientes_t2_fkey FOREIGN KEY(idclientes) REFERENCES  " & mVarglobales.sPrefijoTerminal & "clientes(id_cliente) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "clientes_t", " id_clientes_t  ", " updatedby_t  ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "clientes_t", " id_clientes_t  ", " updatedby_t  ", bd)
+
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "tarifas AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "tarifas_c, " & mVarglobales.sPrefijoTerminal & "diario_tarifas_c WHERE " & mVarglobales.sPrefijoTerminal & "tarifas_c.id_tarifa = " & mVarglobales.sPrefijoTerminal & "diario_tarifas_c.idtarifa)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+ 
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "tarifa_cliente AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "tarifas, " & mVarglobales.sPrefijoTerminal & "clientes_t WHERE " & mVarglobales.sPrefijoTerminal & "tarifas.id_tarifa = " & mVarglobales.sPrefijoTerminal & "clientes_t.idtarifas)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "familias_articulos AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "familias, " & mVarglobales.sPrefijoTerminal & "articulos WHERE " & mVarglobales.sPrefijoTerminal & "familias.id_familia = " & mVarglobales.sPrefijoTerminal & "articulos.idfamilia)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "cliente_tarifa AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "clientes_t, " & mVarglobales.sPrefijoTerminal & "tarifas_c WHERE " & mVarglobales.sPrefijoTerminal & "tarifas_c.id_tarifa = " & mVarglobales.sPrefijoTerminal & "clientes_t.idtarifas)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "parametriza("
+  sql = sql & "id_parametro serial NOT NULL,"
+  sql = sql & "nunticket bigint NOT NULL DEFAULT 0,"
+  sql = sql & "nunarqueo bigint NOT NULL DEFAULT 0,"
+  sql = sql & "nunpago bigint NOT NULL DEFAULT 0,"
+  sql = sql & "nuncredito bigint NOT NULL DEFAULT 0,"
+  sql = sql & "nunprepago bigint NOT NULL DEFAULT 0,"
+  sql = sql & "nunalbarancl bigint NOT NULL DEFAULT 0,"
+  sql = sql & "timeout integer NOT NULL DEFAULT 60,"
+  sql = sql & "created_pa timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_pa decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_pa timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_pa decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT parametriza_pkey PRIMARY KEY (id_parametro)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "parametriza", " id_parametro ", " updatedby_pa ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "parametriza", " id_parametro ", " updatedby_pa ", bd)
+ 
+  sql = "INSERT INTO " & mVarglobales.sPrefijoTerminal & "parametriza (createdby_pa, updatedby_pa) VALUES ('1','1')"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+ 
+ 
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "formaspago("
+  sql = sql & "id_formapago serial NOT NULL,"
+  sql = sql & "descripcion_fpa varchar(50) NOT NULL,"
+  sql = sql & "imagen_fpa varchar(500),"
+  sql = sql & "efectivo testado DEFAULT 'N'::bpchar,"
+  sql = sql & "tpv_fpa testado DEFAULT 'Y'::bpchar,"
+  sql = sql & "delete_fpa Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_fpa timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_fpa decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_fpa timestamp,"
+  sql = sql & "updatedby_fpa decimal(10, 0),"
+  sql = sql & "CONSTRAINT formaspago_pkey PRIMARY KEY (id_formapago)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "formaspago", " id_formapago ", " updatedby_fpa ", bd)
+  mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "formaspago", " id_formapago ", " updatedby_fpa ", bd)
+ 
+ '/// a borrar
+  'sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "formascobro("
+  'sql = sql & "id_formacobro serial NOT NULL,"
+  'sql = sql & "descripcion_fco varchar(50) NOT NULL,"
+  'sql = sql & "imagen_fco varchar(500),"
+  'sql = sql & "efectivo testado DEFAULT 'N'::bpchar,"
+  'sql = sql & "tpv_fco testado DEFAULT 'Y'::bpchar,"
+  'sql = sql & "delete_fco Testado NOT NULL DEFAULT 'N',"
+  'sql = sql & "created_fco timestamp NOT NULL DEFAULT Now(),"
+  'sql = sql & "createdby_fco decimal(10, 0) NOT NULL,"
+  'sql = sql & "updated_fco timestamp,"
+  'sql = sql & "updatedby_fco decimal(10, 0),"
+  'sql = sql & "CONSTRAINT formascobro_pkey PRIMARY KEY (id_formacobro)"
+  'sql = sql & ")"
+  'error_carga = (mConstantes.inf_error_0005)
+  'bd.DbConn.Exec(sql)
+  'mInstalar.respaldo2(mVarglobales.sPrefijoTerminal & "formascobro", " id_formacobro ", " updatedby_fco ", bd)
+  'mInstalar.respaldo_borrar2(mVarglobales.sPrefijoTerminal & "formascobro", " id_formacobro ", " updatedby_fco ", bd)
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "cobros("
+  sql = sql & "id_cobro serial NOT NULL,"
+  sql = sql & "idarqueoc bigint,"
+  sql = sql & "ticket bigint NOT NULL,"
+  sql = sql & "idmesac bigint NOT NULL,"
+  sql = sql & "idclientec bigint,"
+  sql = sql & "idformacobro integer NOT NULL,"
+  sql = sql & "cobradoc decimal(10, 2) DEFAULT 0,"
+  sql = sql & "createdby_c decimal(10, 0) NOT NULL,"
+  sql = sql & "created_c timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "CONSTRAINT cobros_pkey PRIMARY KEY (id_cobro)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "vcobros AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "cobros, " & mVarglobales.sPrefijoTerminal & "formaspago WHERE " & mVarglobales.sPrefijoTerminal & "cobros.idformacobro = " & mVarglobales.sPrefijoTerminal & "formaspago.id_formapago)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "pagostpv("
+  sql = sql & "id_pagotpv serial NOT NULL,"
+  sql = sql & "idarqueo bigint DEFAULT 0,"
+  sql = sql & "idformapago integer NOT NULL,"
+  sql = sql & "descripcion varchar(100),"
+  sql = sql & "cobrado decimal(10, 2) DEFAULT 0,"
+  sql = sql & "createdby_pt decimal(10, 0) NOT NULL,"
+  sql = sql & "created_pt timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "CONSTRAINT pagostpv_pkey PRIMARY KEY (id_pagotpv)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "mesas("
+  sql = sql & "id_mesa serial NOT NULL,"
+  sql = sql & "comedor integer NOT NULL,"
+  sql = sql & "mesa integer NOT NULL,"
+  sql = sql & "comensales integer NOT NULL,"
+  sql = sql & "created_m timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "importetotal numeric DEFAULT 0,"
+  sql = sql & "impresa Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "h_impresa timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "ticket bigint NOT NULL DEFAULT 0,"
+  sql = sql & "idcliente bigint,"
+  sql = sql & "cobrado Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "idarqueo bigint DEFAULT 0,"
+  sql = sql & "createdby_m decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT mesas_pkey PRIMARY KEY (id_mesa),"
+  sql = sql & "CONSTRAINT mesas_mesa_key UNIQUE(mesa,comedor)"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "lineasmesas("
+  sql = sql & "id_lineamesa serial NOT NULL,"
+  sql = sql & "idmesa bigint NOT NULL,"
+  sql = sql & "idarticulo bigint NOT NULL,"
+  sql = sql & "cod_articulo varchar(10) NOT NULL,"
+  sql = sql & "des_articulo varchar(50) NOT NULL,"
+  sql = sql & "pre_articulo decimal(10, 2) DEFAULT 0,"
+  sql = sql & "cant_articulo decimal(10, 1) DEFAULT 1,"
+  sql = sql & "peso_articulo decimal(10, 3) DEFAULT 0,"
+  sql = sql & "porceniva_articulo decimal(2, 2) DEFAULT 0,"
+  sql = sql & "iva_articulo decimal(10, 3) DEFAULT 0,"
+  sql = sql & "total_articulo decimal(10, 2) DEFAULT 0,"
+  sql = sql & "total_linea decimal(10, 3) DEFAULT 0,"
+  sql = sql & "orden_articulo integer DEFAULT 0,"
+  sql = sql & "idarqueo_b bigint DEFAULT 0,"
+  sql = sql & "created_lm timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_lm decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT lineasmesas_pkey PRIMARY KEY (id_lineamesa),"
+  sql = sql & "CONSTRAINT lineasmesas1_fkey FOREIGN KEY(idmesa) REFERENCES  " & mVarglobales.sPrefijoTerminal & "mesas(id_mesa) ON UPDATE CASCADE ON DELETE CASCADE"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+ 
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "lineasmesasborradas("
+  sql = sql & "id_lineamesa bigint NOT NULL,"
+  sql = sql & "idmesa bigint NOT NULL,"
+  sql = sql & "idarticulo bigint NOT NULL,"
+  sql = sql & "cod_articulo varchar(10) NOT NULL,"
+  sql = sql & "des_articulo varchar(50) NOT NULL,"
+  sql = sql & "pre_articulo decimal(10, 2) DEFAULT 0,"
+  sql = sql & "cant_articulo decimal(10, 1) DEFAULT 1,"
+  sql = sql & "peso_articulo decimal(10, 3) DEFAULT 0,"
+  sql = sql & "porceniva_articulo decimal(2, 2) DEFAULT 0,"
+  sql = sql & "iva_articulo decimal(10, 3) DEFAULT 0,"
+  sql = sql & "total_articulo decimal(10, 2) DEFAULT 0,"
+  sql = sql & "total_linea decimal(10, 3) DEFAULT 0,"
+  sql = sql & "orden_articulo integer DEFAULT 0,"
+  sql = sql & "idarqueo_b bigint DEFAULT 0,"
+  sql = sql & "created_lm timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_lm decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT lineasmesasb_pkey PRIMARY KEY (id_lineamesa)"
+  'sql = sql & "CONSTRAINT lineasmesasb1_fkey FOREIGN KEY(idmesa) REFERENCES  " & mVarglobales.sesion[6] & "mesas(id_mesa) ON UPDATE CASCADE ON DELETE NO ACTION" 
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "vlineas AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "mesas, " & mVarglobales.sPrefijoTerminal & "lineasmesasborradas WHERE " & mVarglobales.sPrefijoTerminal & "mesas.ticket = " & mVarglobales.sPrefijoTerminal & "lineasmesasborradas.idmesa)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+
+
+
+ sql = "  CREATE OR Replace FUNCTION alta_lineamesa(text[]) "
+ sql = sql & " RETURNS BOOLEAN AS "
+ sql = sql & " $BODY$ DECLARE "
+ sql = sql & "/********************************************************************************************************" & "\n"
+ sql = sql & "* The contents OF this file are subject TO the GPL V.3" & "\n"
+ sql = sql & "* The Original Code IS TPV - ERP." & "\n"
+ sql = sql & "* All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+ sql = sql & "* All Rights Reserved." & "\n" & "\n"
+ sql = sql & "********************************************************************************************************/" & "\n"
+  sql = sql & " result RECORD; " & "\n"
+  sql = sql & " contador Int; " & "\n"
+  sql = sql & " matriz ALIAS FOR $1; " & "\n"
+  sql = sql & " resul1 varchar(10); " & "\n"
+  sql = sql & " articulo Int; " & "\n"
+  sql = sql & " mesa Int; " & "\n"
+  sql = sql & " codarti varchar(10); " & "\n"
+  sql = sql & " precio numeric(10, 2); " & "\n"
+  sql = sql & " cantidad numeric(10, 1); " & "\n"
+  sql = sql & " peso numeric(10, 3); " & "\n"
+  sql = sql & " porceniva numeric(2, 2); " & "\n"
+  sql = sql & " iva numeric(10, 3); " & "\n"
+  sql = sql & " total numeric(10, 2); " & "\n"
+  sql = sql & " totlinea numeric(10, 3); " & "\n"
+  sql = sql & " orden Int; " & "\n"
+  sql = sql & " creado Int; " & "\n"
+  sql = sql & " BEGIN " & "\n"
+  sql = sql & " mesa = matriz[1]; " & "\n"
+  sql = sql & " articulo = matriz[2]; " & "\n"
+  sql = sql & " codarti = matriz[3]; " & "\n"
+  sql = sql & " precio = matriz[5]; " & "\n"
+  sql = sql & " cantidad = matriz[6]; " & "\n"
+  sql = sql & " peso = matriz[7]; " & "\n"
+  sql = sql & " porceniva = matriz[8]; " & "\n"
+  sql = sql & " iva = matriz[9]; " & "\n"
+  sql = sql & " total = matriz[10]; " & "\n"
+  sql = sql & " totlinea = matriz[11]; " & "\n"
+  sql = sql & " orden = matriz[12]; " & "\n"
+  sql = sql & " creado = matriz[13]; " & "\n"
+  sql = sql & " SELECT INTO result * FROM " & mVarglobales.sPrefijoTerminal & "lineasmesas WHERE idarticulo = articulo AND idmesa = mesa AND pre_articulo = precio; " & "\n"
+  sql = sql & "     IF result.cod_articulo IS NULL THEN " & "\n"
+  sql = sql & "       INSERT INTO " & mVarglobales.sPrefijoTerminal & "lineasmesas(idmesa, idarticulo, cod_articulo, des_articulo, pre_articulo, cant_articulo, peso_articulo, porceniva_articulo, iva_articulo, total_articulo, total_linea, orden_articulo, createdby_lm)VALUES(mesa, articulo, codarti, matriz[4], precio, cantidad, peso, porceniva, iva, total, totlinea, orden, creado); " & "\n"
+  sql = sql & "       SELECT INTO result SUM(total_linea) AS stotal FROM " & mVarglobales.sPrefijoTerminal & "lineasmesas WHERE idmesa = mesa GROUP BY idmesa; " & "\n"
+  sql = sql & "       update " & mVarglobales.sPrefijoTerminal & "mesas SET importetotal = result.stotal WHERE id_mesa = mesa; " & "\n"
+  sql = sql & "       RETURN TRUE; " & "\n"
+  sql = sql & "     ELSE " & "\n"
+  sql = sql & "       cantidad = cantidad + result.cant_articulo; " & "\n"
+  sql = sql & "       peso = peso + result.peso_articulo; " & "\n"
+  'sql = sql & "       iva = iva + result.iva_articulo; " & "\n"                AQUI SE PRODUCÍA UN ERROR EN EL IVA POR ARRASTRE DE DECIMALES
+  'sql = sql & "       total = total + result.total_articulo; " & "\n"          
+  'sql = sql & "       totlinea = totlinea + result.total_linea; " & "\n"
+  sql = sql & "       IF peso > 0 THEN " & "\n"
+  sql = sql & "           total = round((precio * peso),2); " & "\n"
+  sql = sql & "           iva = round((total * porceniva),3); " & "\n"
+  sql = sql & "       ELSE " & "\n"
+  sql = sql & "           total = round((precio * cantidad),2); " & "\n"
+  sql = sql & "           iva = round((total * porceniva),3); " & "\n"
+  sql = sql & "       END IF ; " & "\n"
+  sql = sql & "            totlinea = total + iva; " & "\n"
+  sql = sql & "       update " & mVarglobales.sPrefijoTerminal & "lineasmesas SET cant_articulo = cantidad, peso_articulo = peso, iva_articulo = iva, total_articulo = total, total_linea = totlinea WHERE idarticulo = articulo AND idmesa = mesa AND pre_articulo = precio; " & "\n"
+  sql = sql & "       SELECT INTO result SUM(total_linea) AS stotal FROM " & mVarglobales.sPrefijoTerminal & "lineasmesas WHERE idmesa = mesa GROUP BY idmesa; " & "\n"
+  sql = sql & "       update " & mVarglobales.sPrefijoTerminal & "mesas SET importetotal = result.stotal WHERE id_mesa = mesa; " & "\n"
+  sql = sql & "       RETURN TRUE; " & "\n"
+  sql = sql & "    END IF ; " & "\n"
+ sql = sql & " EXCEPTION " & "\n"
+ sql = sql & " WHEN OTHERS THEN " & "\n"
+ sql = sql & "   RETURN FALSE; " & "\n" & "\n"
+ sql = sql & " END ; $BODY$ " & "\n"
+ sql = sql & "   LANGUAGE 'plpgsql' VOLATILE " & "\n"
+ sql = sql & "   COST 100; " & "\n"
+ error_carga = (("No se ha podido crear la función  alta_lineamesa revisa la sentencia SQL"))
+ bd.DbConn.Exec(sql)
+
+
+ sql = "  CREATE OR Replace FUNCTION baja_lineamesa(text[]) "
+ sql = sql & " RETURNS BOOLEAN AS "
+ sql = sql & " $BODY$ DECLARE "
+ sql = sql & "/********************************************************************************************************" & "\n"
+ sql = sql & "* The contents OF this file are subject TO the GPL V.3" & "\n"
+ sql = sql & "* The Original Code IS TPV - ERP." & "\n"
+ sql = sql & "* All portions are Copyright(C)2008 - 2009 JORGE MARTIN AZNAR" & "\n"
+ sql = sql & "* All Rights Reserved." & "\n" & "\n"
+ sql = sql & "********************************************************************************************************/" & "\n"
+ sql = sql & " result RECORD; " & "\n"
+ sql = sql & " matriz ALIAS FOR $1; " & "\n"
+ sql = sql & " resul1 varchar(10); " & "\n"
+ sql = sql & " idlinea Int; " & "\n"
+ sql = sql & " mesa Int; " & "\n"
+ sql = sql & " idticket Int; " & "\n"
+ sql = sql & " tot numeric(10, 2); " & "\n"
+ sql = sql & " BEGIN " & "\n"
+ sql = sql & " mesa = matriz[1]; " & "\n"
+ sql = sql & " idlinea = matriz[2]; " & "\n"
+ sql = sql & " idticket = matriz[3]; " & "\n"
+ sql = sql & " INSERT INTO  " & mVarglobales.sPrefijoTerminal & "lineasmesasborradas SELECT * FROM " & mVarglobales.sPrefijoTerminal & "lineasmesas  WHERE id_lineamesa = idlinea; " & "\n"
+ sql = sql & "       update " & mVarglobales.sPrefijoTerminal & "lineasmesasborradas SET idmesa = idticket WHERE id_lineamesa = idlinea; " & "\n"
+ sql = sql & " DELETE FROM  " & mVarglobales.sPrefijoTerminal & "lineasmesas  WHERE id_lineamesa = idlinea; " & "\n"
+ sql = sql & "       SELECT INTO result SUM(total_linea) AS stotal FROM " & mVarglobales.sPrefijoTerminal & "lineasmesas WHERE idmesa = mesa GROUP BY idmesa; " & "\n"
+ sql = sql & "       IF result.stotal IS NULL THEN " & "\n"
+ sql = sql & "           tot=0; " & "\n"
+ sql = sql & "       ELSE " & "\n"
+ sql = sql & "           tot=result.stotal; " & "\n"
+ sql = sql & "       END IF ; " & "\n"
+ sql = sql & "       update " & mVarglobales.sPrefijoTerminal & "mesas SET importetotal = tot WHERE id_mesa = mesa; " & "\n"
+ sql = sql & "       RETURN TRUE;" & "\n"
+ sql = sql & " EXCEPTION " & "\n"
+ sql = sql & " WHEN OTHERS THEN " & "\n"
+ sql = sql & "   RETURN FALSE; " & "\n" & "\n"
+ sql = sql & " END ; $BODY$ " & "\n"
+ sql = sql & "   LANGUAGE 'plpgsql' VOLATILE " & "\n"
+ sql = sql & "   COST 100; " & "\n"
+ error_carga = (("No se ha podido crear la función   baja_lineamesa revisa la sentencia SQL"))
+ bd.DbConn.Exec(sql)
+
+
+ sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "cambios("
+ sql = sql & "id_cambio serial NOT NULL,"
+ sql = sql & "idarqueo bigint DEFAULT 0,"
+ sql = sql & "cambio varchar(250) NOT NULL,"
+ sql = sql & "createdby_c decimal(10, 0) NOT NULL,"
+ sql = sql & "CONSTRAINT cambios_pkey PRIMARY KEY (id_cambio)"
+ sql = sql & ")"
+ error_carga = (mConstantes.inf_error_0005)
+ bd.DbConn.Exec(sql)
+
+
+ sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "tickets("
+ sql = sql & "id_ticket bigint NOT NULL,"
+ sql = sql & "comedor integer NOT NULL,"
+ sql = sql & "mesa integer NOT NULL,"
+ sql = sql & "comensales integer NOT NULL,"
+ sql = sql & "created_t date NOT NULL DEFAULT Now(),"
+ sql = sql & "importetotal numeric DEFAULT 0,"
+ sql = sql & "impresa Testado NOT NULL DEFAULT 'N',"
+ sql = sql & "h_impresa timestamp NOT NULL DEFAULT Now(),"
+ sql = sql & "idcliente bigint,"
+ sql = sql & "cobrado Testado NOT NULL DEFAULT 'Y',"
+ sql = sql & "idarqueo bigint DEFAULT 0,"
+ sql = sql & "facturado Testado DEFAULT 'N',"
+ sql = sql & "multicobro Testado DEFAULT 'N',"
+ sql = sql & "createdby_t decimal(10, 0) NOT NULL,"
+ sql = sql & "CONSTRAINT tickets_pkey PRIMARY KEY (id_ticket)"
+ sql = sql & ")"
+ error_carga = (mConstantes.inf_error_0005)
+ bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "lineastickets("
+  sql = sql & "id_lineaticket serial NOT NULL,"
+  sql = sql & "idticket bigint NOT NULL,"
+  sql = sql & "idarticulo bigint NOT NULL,"
+  sql = sql & "cod_articulo varchar(10) NOT NULL,"
+  sql = sql & "des_articulo varchar(50) NOT NULL,"
+  sql = sql & "pre_articulo decimal(10, 2) DEFAULT 0,"
+  sql = sql & "cant_articulo decimal(10, 1) DEFAULT 1,"
+  sql = sql & "peso_articulo decimal(10, 3) DEFAULT 0,"
+  sql = sql & "porceniva_articulo decimal(2, 2) DEFAULT 0,"
+  sql = sql & "iva_articulo decimal(10, 3) DEFAULT 0,"
+  sql = sql & "total_articulo decimal(10, 2) DEFAULT 0,"
+  sql = sql & "total_linea decimal(10, 3) DEFAULT 0,"
+  sql = sql & "orden_articulo integer DEFAULT 0,"
+  sql = sql & "idarqueo_l bigint DEFAULT 0,"
+  sql = sql & "created_lm timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_lm decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT lineastickets_pkey PRIMARY KEY (id_lineaticket),"
+  sql = sql & "CONSTRAINT lineastickets1_fkey FOREIGN KEY(idticket) REFERENCES  " & mVarglobales.sPrefijoTerminal & "tickets(id_ticket) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "vtickets AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "tickets, " & mVarglobales.sPrefijoTerminal & "lineastickets WHERE " & mVarglobales.sPrefijoTerminal & "tickets.id_ticket = " & mVarglobales.sPrefijoTerminal & "lineastickets.idticket)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "vlineas2 AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "tickets, " & mVarglobales.sPrefijoTerminal & "lineasmesasborradas WHERE " & mVarglobales.sPrefijoTerminal & "tickets.id_ticket= " & mVarglobales.sPrefijoTerminal & "lineasmesasborradas.idmesa)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "frastickets("
+  sql = sql & "id_fraticket serial NOT NULL,"
+  sql = sql & "nunfraticket bigint NOT NULL,"
+  sql = sql & "fechafra timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "idcliente bigint NOT NULL,"
+  sql = sql & "importetotal numeric DEFAULT 0,"
+  sql = sql & "base numeric DEFAULT 0,"
+  sql = sql & "iva numeric DEFAULT 0,"
+  sql = sql & "concepto varchar(150) NOT NULL,"
+  sql = sql & "cantidad numeric DEFAULT 0,"
+  sql = sql & "precio numeric DEFAULT 0,"
+  sql = sql & "noimp_cabecera Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "imp_concepto Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "borrada Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "idarqueofra integer NOT NULL DEFAULT 0,"
+  sql = sql & "created_frt timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_frt  decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_frt  timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_frt  decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT frastickets_pkey PRIMARY KEY (id_fraticket),"
+  sql = sql & "CONSTRAINT frastickets_fkey FOREIGN KEY(idcliente) REFERENCES  " & mVarglobales.sPrefijoTerminal & "clientes(id_cliente) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "lineasfrastickets("
+  sql = sql & "id_lineafraticket serial NOT NULL,"
+  sql = sql & "idfraticket bigint NOT NULL,"
+  sql = sql & "idticket bigint NOT NULL,"
+  sql = sql & "baseticket numeric DEFAULT 0,"
+  sql = sql & "ivaticket numeric DEFAULT 0,"
+  sql = sql & "fechaticket date NOT NULL DEFAULT Now(),"
+  sql = sql & "borrada Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "created_lfrt timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_lfrt  decimal(10, 0) NOT NULL,"
+  sql = sql & "updated_lfrt  timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_lfrt  decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT lineasfrastickets_pkey PRIMARY KEY (id_lineafraticket),"
+  sql = sql & "CONSTRAINT lineasfrastickets1_fkey FOREIGN KEY(idfraticket) REFERENCES  " & mVarglobales.sPrefijoTerminal & "frastickets(id_fraticket) ON UPDATE CASCADE ON DELETE NO ACTION,"
+  sql = sql & "CONSTRAINT lineasfrastickets2_fkey FOREIGN KEY(idticket) REFERENCES  " & mVarglobales.sPrefijoTerminal & "tickets(id_ticket) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "frastickets_clientes AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "clientes, " & mVarglobales.sPrefijoTerminal & "frastickets WHERE " & mVarglobales.sPrefijoTerminal & "clientes.id_cliente = " & mVarglobales.sPrefijoTerminal & "frastickets.idcliente)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE OR REPLACE FUNCTION " & mVarglobales.sPrefijoTerminal & "marca_ticket() RETURNS trigger AS ' begin "
+  sql = sql & "  update " & mVarglobales.sPrefijoTerminal & "tickets SET facturado=" & "''" & "Y" & "''" & " WHERE id_ticket=new.idticket; " & "\n"
+  sql = sql & " return null;" & "\n"
+  sql = sql & " end;" & "\n"
+  sql = sql & "' LANGUAGE 'plpgsql'" & "\n"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE TRIGGER " & mVarglobales.sPrefijoTerminal & "lineasfrastickets" & "\n"
+  sql = sql & " AFTER INSERT" & "\n"
+  sql = sql & " ON  " & mVarglobales.sPrefijoTerminal & "lineasfrastickets " & "\n"
+  sql = sql & " FOR EACH ROW" & "\n"
+  sql = sql & " EXECUTE PROCEDURE  " & mVarglobales.sPrefijoTerminal & "marca_ticket" & "();"
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE OR REPLACE FUNCTION " & mVarglobales.sPrefijoTerminal & "desmarca_ticket() RETURNS trigger AS ' begin "
+  sql = sql & "  update " & mVarglobales.sPrefijoTerminal & "tickets SET facturado=" & "''" & "N" & "''" & " WHERE id_ticket=new.idticket; " & "\n"
+  sql = sql & " return null;" & "\n"
+  sql = sql & " end;" & "\n"
+  sql = sql & "' LANGUAGE 'plpgsql'" & "\n"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE TRIGGER " & mVarglobales.sPrefijoTerminal & "lineasfrastickets2" & "\n"
+  sql = sql & " AFTER UPDATE" & "\n"
+  sql = sql & " ON  " & mVarglobales.sPrefijoTerminal & "lineasfrastickets " & "\n"
+  sql = sql & " FOR EACH ROW" & "\n"
+  sql = sql & " EXECUTE PROCEDURE  " & mVarglobales.sPrefijoTerminal & "desmarca_ticket" & "();"
+  bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "creditos("
+  sql = sql & "id_credito serial NOT NULL,"
+  sql = sql & "idticket bigint NOT NULL,"
+  sql = sql & "idcliente bigint NOT NULL,"
+  sql = sql & "idarqueo bigint DEFAULT 0,"
+  sql = sql & "idarqueopago bigint DEFAULT 0,"
+  sql = sql & "cobrado Testado NOT NULL DEFAULT 'N',"
+  sql = sql & "idformacobro  bigint DEFAULT 0,"
+  sql = sql & "importecredito numeric DEFAULT 0,"
+  sql = sql & "updated_cr timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_cr decimal(10, 0),"
+  sql = sql & "created_cr timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_lm decimal(10, 0) NOT NULL,"
+  sql = sql & "CONSTRAINT credito_pkey PRIMARY KEY (id_credito),"
+  sql = sql & "CONSTRAINT credito1_fkey FOREIGN KEY(idticket) REFERENCES  " & mVarglobales.sPrefijoTerminal & "tickets(id_ticket) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+ 
+  sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "prepagos("
+  sql = sql & "id_prepago serial NOT NULL,"
+  sql = sql & "idcliente bigint NOT NULL,"
+  sql = sql & "idarqueo bigint DEFAULT 0,"
+  sql = sql & "idticket bigint DEFAULT 0,"
+  sql = sql & "idformacobroprepago  bigint,"
+  sql = sql & "importedebe numeric DEFAULT 0,"
+  sql = sql & "importehaber numeric DEFAULT 0,"
+  sql = sql & "updated_pr timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "updatedby_pr decimal(10, 0),"
+  sql = sql & "created_pr timestamp NOT NULL DEFAULT Now(),"
+  sql = sql & "createdby_pr decimal(10, 0),"
+  sql = sql & "CONSTRAINT prepago_pkey PRIMARY KEY (id_prepago),"
+  sql = sql & "CONSTRAINT prepago_fkey FOREIGN KEY(idformacobroprepago) REFERENCES  " & mVarglobales.sPrefijoTerminal & "formaspago(id_formapago) ON UPDATE CASCADE ON DELETE NO ACTION,"
+  sql = sql & "CONSTRAINT prepago2_fkey FOREIGN KEY(idcliente) REFERENCES  " & mVarglobales.sPrefijoTerminal & "clientes(id_cliente) ON UPDATE CASCADE ON DELETE NO ACTION"
+  sql = sql & ")"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE OR REPLACE FUNCTION " & mVarglobales.sPrefijoTerminal & "cobros() RETURNS trigger AS ' begin "
+  sql = sql & " IF  new.idformacobro = 9999 THEN " & "\n"
+  sql = sql & " insert into " & mVarglobales.sPrefijoTerminal & "creditos(idticket, idcliente, importecredito, createdby_lm)" & "\n"
+  sql = sql & " values(" & "\n"
+  sql = sql & " new.ticket," & "\n"
+  sql = sql & " new.idclientec," & "\n"
+  sql = sql & " new.cobradoc," & "\n"
+  sql = sql & " new.createdby_c " & "\n"
+  sql = sql & ");" & "\n"
+  sql = sql & " end if;" & "\n"
+  sql = sql & " IF  new.idformacobro = 9998 THEN " & "\n"
+  sql = sql & " insert into " & mVarglobales.sPrefijoTerminal & "prepagos(idticket, idcliente, importedebe, idformacobroprepago, createdby_pr)" & "\n"
+  sql = sql & " values(" & "\n"
+  sql = sql & " new.ticket," & "\n"
+  sql = sql & " new.idclientec," & "\n"
+  sql = sql & " new.cobradoc," & "\n"
+  sql = sql & " 1," & "\n"
+  sql = sql & " new.createdby_c); " & "\n"
+  sql = sql & " end if;" & "\n"
+  sql = sql & " return null;" & "\n"
+  sql = sql & " end;" & "\n"
+  sql = sql & "' LANGUAGE 'plpgsql'" & "\n"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE TRIGGER " & mVarglobales.sPrefijoTerminal & "cobros" & "\n"
+  sql = sql & " AFTER INSERT" & "\n"
+  sql = sql & " ON  " & mVarglobales.sPrefijoTerminal & "cobros " & "\n"
+  sql = sql & " FOR EACH ROW" & "\n"
+  sql = sql & " EXECUTE PROCEDURE  " & mVarglobales.sPrefijoTerminal & "cobros" & "();"
+  bd.DbConn.Exec(sql)
+
+
+  sql = "CREATE OR REPLACE FUNCTION " & mVarglobales.sPrefijoTerminal & "creditos() RETURNS trigger AS ' begin "
+  sql = sql & " IF new.idformacobro = 9998 THEN " & "\n"
+  sql = sql & " insert into " & mVarglobales.sPrefijoTerminal & "prepagos(idticket, idcliente, importedebe, idformacobroprepago, createdby_pr)" & "\n"
+  sql = sql & " values(" & "\n"
+  sql = sql & " old.idticket," & "\n"
+  sql = sql & " old.idcliente," & "\n"
+  sql = sql & " old.importecredito," & "\n"
+  sql = sql & " 1," & "\n"
+  sql = sql & " new.updatedby_cr " & "\n"
+  sql = sql & ");" & "\n"
+  sql = sql & " end if;" & "\n"
+  sql = sql & " return null;" & "\n"
+  sql = sql & " end;" & "\n"
+  sql = sql & "' LANGUAGE 'plpgsql'" & "\n"
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE TRIGGER " & mVarglobales.sPrefijoTerminal & "creditos" & "\n"
+  sql = sql & " AFTER UPDATE" & "\n"
+  sql = sql & " ON  " & mVarglobales.sPrefijoTerminal & "creditos " & "\n"
+  sql = sql & " FOR EACH ROW" & "\n"
+  sql = sql & " EXECUTE PROCEDURE  " & mVarglobales.sPrefijoTerminal & "creditos" & "();"
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "creditos_clientes AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "clientes, " & mVarglobales.sPrefijoTerminal & "creditos WHERE " & mVarglobales.sPrefijoTerminal & "clientes.id_cliente = " & mVarglobales.sPrefijoTerminal & "creditos.idcliente)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "creditos_clientes_formas AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "creditos_clientes, " & mVarglobales.sPrefijoTerminal & "formaspago WHERE " & mVarglobales.sPrefijoTerminal & "formaspago.id_formapago = " & mVarglobales.sPrefijoTerminal & "creditos_clientes.idformacobro)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "prepagos_clientes AS (SELECT " & mVarglobales.sPrefijoTerminal & "clientes.id_cliente, " & mVarglobales.sPrefijoTerminal & "clientes.nombre_cl, " & mVarglobales.sPrefijoTerminal & "prepagos.idcliente, SUM(" & mVarglobales.sPrefijoTerminal & "prepagos.importehaber) - SUM(" & mVarglobales.sPrefijoTerminal & "prepagos.importedebe) AS stotal FROM " & mVarglobales.sPrefijoTerminal & "clientes, " & mVarglobales.sPrefijoTerminal & "prepagos WHERE " & mVarglobales.sPrefijoTerminal & "clientes.id_cliente = " & mVarglobales.sPrefijoTerminal & "prepagos.idcliente group by " & mVarglobales.sPrefijoTerminal & "clientes.id_cliente, " & mVarglobales.sPrefijoTerminal & "clientes.nombre_cl, " & mVarglobales.sPrefijoTerminal & "prepagos.idcliente)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "prepagos_cobros AS (SELECT * FROM  " & mVarglobales.sPrefijoTerminal & "prepagos,  " & mVarglobales.sPrefijoTerminal & "formaspago WHERE  " & mVarglobales.sPrefijoTerminal & "formaspago.id_formapago =  " & mVarglobales.sPrefijoTerminal & "prepagos.idformacobroprepago)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "vticketscobro AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "vtickets , " & mVarglobales.sPrefijoTerminal & "vcobros WHERE " & mVarglobales.sPrefijoTerminal & "vtickets.id_ticket = " & mVarglobales.sPrefijoTerminal & "vcobros.ticket)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "vticketsfcobro AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "tickets , " & mVarglobales.sPrefijoTerminal & "cobros WHERE " & mVarglobales.sPrefijoTerminal & "tickets.id_ticket = " & mVarglobales.sPrefijoTerminal & "cobros.ticket)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+  sql = "CREATE OR Replace VIEW " & mVarglobales.sPrefijoTerminal & "vcobros2 AS ( SELECT * FROM " & mVarglobales.sPrefijoTerminal & "cobros, " & mVarglobales.sPrefijoTerminal & "vtickets WHERE " & mVarglobales.sPrefijoTerminal & "cobros.ticket = " & mVarglobales.sPrefijoTerminal & "vtickets.id_ticket)"
+  error_carga = (mConstantes.inf_error_0005)
+  bd.DbConn.Exec(sql)
+  
+
+ sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "albaranescl("
+ sql = sql & "id_albarancl serial NOT NULL,"
+ sql = sql & "num_albcl bigint NOT NULL,"
+ sql = sql & "fecha_albcl date NOT NULL DEFAULT Now(),"
+ sql = sql & "fecha_entalbcl date NOT NULL DEFAULT Now(),"
+ sql = sql & "idcliente bigint,"
+ sql = sql & "iddireccionenvio bigint DEFAULT 0,"
+ sql = sql & "idformacobro bigint,"
+ sql = sql & "idagente bigint DEFAULT 0,"
+ sql = sql & "idtarifa bigint DEFAULT 0,"
+ sql = sql & "facturado Testado DEFAULT 'N',"
+ sql = sql & "listado Testado DEFAULT 'N',"
+ sql = sql & "entregado Testado DEFAULT 'N',"
+ sql = sql & "borrado Testado DEFAULT 'N',"
+ sql = sql & "incidencia Testado DEFAULT 'N',"
+ sql = sql & "observaciones varchar(250),"
+ sql = sql & "base_albcl numeric DEFAULT 0,"
+ sql = sql & "iva_albcl numeric DEFAULT 0,"
+ sql = sql & "total_albcl numeric DEFAULT 0,"
+ sql = sql & "created_albcl date NOT NULL DEFAULT Now(),"
+ sql = sql & "createdby_albcl decimal(10, 0) NOT NULL,"
+ sql = sql & "CONSTRAINT albaranescl_pkey PRIMARY KEY (id_albarancl),"
+ sql = sql & "CONSTRAINT albaranescl2_fkey FOREIGN KEY(idcliente) REFERENCES  " & mVarglobales.sPrefijoTerminal & "clientes(id_cliente) ON UPDATE CASCADE ON DELETE NO ACTION,"
+ sql = sql & "CONSTRAINT albaranescl3_fkey FOREIGN KEY(idformacobro) REFERENCES  " & mVarglobales.sPrefijoTerminal & "formaspago(id_formapago) ON UPDATE CASCADE ON DELETE NO ACTION"
+ sql = sql & ")"
+ error_carga = (mConstantes.inf_error_0005)
+ bd.DbConn.Exec(sql)
+  
+ sql = "CREATE TABLE " & mVarglobales.sPrefijoTerminal & "lialbaranescl("
+ sql = sql & "id_lialbarancl serial NOT NULL,"
+ sql = sql & "idalbarancl bigint NOT NULL,"
+ sql = sql & "idfactura bigint DEFAULT 0,"
+ sql = sql & "idarticulo bigint,"
+ sql = sql & "cod_articulo varchar(10) NOT NULL,"
+ sql = sql & "des_articulo varchar(50) NOT NULL,"
+ sql = sql & "pre_articulo decimal(10, 2) DEFAULT 0,"
+ sql = sql & "desc_articulo numeric DEFAULT 0,"
+ sql = sql & "cant_articulo decimal(10, 1) DEFAULT 1,"
+ sql = sql & "peso_articulo decimal(10, 3) DEFAULT 0,"
+ sql = sql & "porceniva_articulo decimal(2, 2) DEFAULT 0,"
+ sql = sql & "comis_articulo numeric DEFAULT 0,"
+ sql = sql & "traza_articulo varchar(20) DEFAULT 0,"
+ sql = sql & "lote_articulo varchar(20) DEFAULT 0,"
+ sql = sql & "cadu_articulo varchar(20) DEFAULT 0,"
+ sql = sql & "garan_articulo varchar(20) DEFAULT 0,"
+ sql = sql & "anada_articulo varchar(20) DEFAULT 0,"
+ sql = sql & "borrado_li Testado DEFAULT 'N',"
+ sql = sql & "base_lialbcl numeric DEFAULT 0,"
+ sql = sql & "iva_lialbcl numeric DEFAULT 0,"
+ sql = sql & "total_lialbcl numeric DEFAULT 0,"
+ sql = sql & "created_lialbcl date NOT NULL DEFAULT Now(),"
+ sql = sql & "createdby_lialbcl decimal(10, 0) NOT NULL,"
+ sql = sql & "CONSTRAINT lialbaranescl_pkey PRIMARY KEY (id_lialbarancl),"
+ sql = sql & "CONSTRAINT lialbaranescl2_fkey FOREIGN KEY(idarticulo) REFERENCES  " & mVarglobales.sPrefijoTerminal & "articulos(id_articulo) ON UPDATE CASCADE ON DELETE NO ACTION"
+ sql = sql & ")"
+ error_carga = (mConstantes.inf_error_0005)
+ bd.DbConn.Exec(sql)
+  mInstalar.datosdeejemplo(bd)
+  bd.DbConn.Commit
+  Return True
+  Catch
+  Message.Error(error_carga)
+  coge_error()
+  Return False
+End
+
+
+
+
+ Public Function respaldo2(nombretabla As String, campoid As String, updatedby As String, bd As CPostgres)
+      Dim sql As String
+      Dim Rs As Result
+      Dim nombrecolumna As String   'Fcrearbase.C
+      
+      sql = "SELECT column_name FROM information_schema.columns WHERE table_name = '"
+      sql = sql & nombretabla & "'"
+      Rs = bd.DbConn.Exec(sql)
+    
+      sql = "CREATE OR REPLACE FUNCTION " & nombretabla & "() RETURNS trigger AS ' begin "
+      
+       Do While Rs.Available
+            nombrecolumna = Rs["column_name"]
+            sql = sql & " IF (old." & nombrecolumna & " != NEW." & nombrecolumna & ") THEN " & "\n"
+            sql = sql & "insert into " & mVarglobales.sPrefijo & "historial(created, createdby, tabla, campo, id, oldvalue, newvalue)" & "\n"
+            sql = sql & " values(" & "\n"
+            sql = sql & " now()," & "\n"
+            sql = sql & " new." & updatedby & "," & "\n"
+            sql = sql & "''" & nombretabla & "''," & "\n"
+            sql = sql & "''" & nombrecolumna & "''," & "\n"
+            sql = sql & " old." & campoid & "," & "\n"
+            sql = sql & " old." & nombrecolumna & "," & "\n"
+            sql = sql & " new." & nombrecolumna & "\n"
+            sql = sql & ");" & "\n"
+            sql = sql & " end if;" & "\n"
+            Rs.MoveNext
+       Loop
+      
+       sql = sql & " return null;" & "\n"
+       sql = sql & " end;" & "\n"
+       sql = sql & "' LANGUAGE 'plpgsql'" & "\n"
+       Rs = bd.DbConn.Exec(sql)
+      
+       sql = "CREATE TRIGGER " & nombretabla & "\n"
+       sql = sql & " AFTER UPDATE" & "\n"
+       sql = sql & " ON  " & nombretabla & "\n"
+       sql = sql & " FOR EACH ROW" & "\n"
+       sql = sql & " EXECUTE PROCEDURE  " & nombretabla & "();"
+       Rs = bd.DbConn.Exec(sql)
+End
+
+
+
+ Public Function respaldo_borrar2(nombretabla As String, campoid As String, updatedby As String, bd As CPostgres)
+      Dim sql As String
+      Dim Rs As Result
+      Dim nombrecolumna As String
+      Dim nombretabla1 As String
+
+      nombretabla1 = nombretabla & "_del"
+
+      sql = "SELECT column_name FROM information_schema.columns WHERE table_name = '"
+      sql = sql & nombretabla & "'"
+      Rs = bd.DbConn.Exec(sql)
+
+      sql = "CREATE OR REPLACE FUNCTION " & nombretabla1 & "() RETURNS trigger AS ' begin "
+      
+       Do While Rs.Available
+            nombrecolumna = Rs["column_name"]
+            sql = sql & "insert into " & mVarglobales.sPrefijo & "historial(created, createdby, tabla, campo, id, oldvalue, newvalue)" & "\n"
+            sql = sql & " values(" & "\n"
+            sql = sql & " now()," & "\n"
+            sql = sql & " old." & updatedby & "," & "\n"
+            sql = sql & "''" & nombretabla & "''," & "\n"
+            sql = sql & "''" & nombrecolumna & "''," & "\n"
+            sql = sql & " old." & campoid & "," & "\n"
+            sql = sql & " old." & nombrecolumna & "," & "\n"
+            sql = sql & " ''borrado''" & "\n"
+            sql = sql & ");" & "\n"
+            Rs.MoveNext
+       Loop
+
+       sql = sql & " return null;" & "\n"
+       sql = sql & " end;" & "\n"
+       sql = sql & "' LANGUAGE 'plpgsql'"
+       Rs = bd.DbConn.Exec(sql)
+
+       sql = "CREATE TRIGGER " & nombretabla1 & "\n"
+       sql = sql & " AFTER DELETE" & "\n"
+       sql = sql & " ON  " & nombretabla & "\n"
+       sql = sql & " FOR EACH ROW" & "\n"
+       sql = sql & " EXECUTE PROCEDURE  " & nombretabla1 & "();"
+       Rs = bd.DbConn.Exec(sql)
+End
+
+
+
+Public Function datosdeejemplo(bd As CPostgres) As Boolean
+  Dim sql As String
+  Dim resultado As Result
+  Dim hFile As File
+  Dim sLine As String
+  Dim datos As New String[]
+  Dim ficheros As New String[]
+  Dim i As Integer = 0
+
+  datos.Add("INSERT INTO " & mVarglobales.sPrefijo & "iva(codigo, descripcion, iva, recargo, delete_i, created_i, createdby_i, updated_i, updatedby_i)")
+  datos.Add("INSERT INTO " & mVarglobales.sPrefijo & "formaspago(descripcion_fpa,imagen_fpa,efectivo,delete_fpa,created_fpa,createdby_fpa,updated_fpa,updatedby_fpa)")
+  datos.Add("INSERT INTO " & mVarglobales.sPrefijo & "clientes(nombre_cl,cif,direccion,poblacion,provincia,cpostal,phone,phone2,fax,email,web,tpv,createdby_cl,updatedby_cl)")
+  datos.Add("INSERT INTO " & mVarglobales.sPrefijo & "familias(codigo,descripcion,garantia,lote,caducidad,anada,cbarras,ordenf,tpv,imagen,delete_f,created_f,createdby_f,updated_f,updatedby_f)")
+  datos.Add("INSERT INTO " & mVarglobales.sPrefijo & "articulos(codigo_a, descripcion_a, idfamilia, idivaresta, pvresta, idivacompra, importepvfijo, pidepeso, peso, createdby_a, updatedby_a)")
+  ficheros.Add(Application.path & "/csv/iva.csv")
+  ficheros.Add(Application.path & "/csv/formasdecobro.csv")
+  ficheros.Add(Application.path & "/csv/clientes.csv")
+  ficheros.Add(Application.path & "/csv/Familias.csv")
+  ficheros.Add(Application.path & "/csv/articulos2.csv")
+
+  
+  For i = 0 To ficheros.Count - 1
+      hFile = Open ficheros[i] For Input
+      While Not Eof(hFile)
+        Line Input #hFile, sLine
+        sline = mFuncionesg.fueracoma(sLine)
+        If sLine <> "" Then
+            sql = datos[i] & "VALUES(" & meteysaca(sLine) & ")"
+            bd.DbConn.Exec(sql)
+        Endif
+      Wend
+      hFile.Close
+  Next
+
+   'sql = "COPY  " & mVarglobales.sPrefijo & "iva(codigo,descripcion,iva,recargo,delete_i,created_i,createdby_i,updated_i,updatedby_i) FROM '" & Application.path & "/csv/iva.csv' delimiters ';';"
+   'TRY FPrincipal.bd1.DbConn.Exec(sql)
+   'sql = "COPY  " & mVarglobales.sPrefijo & "formascobro(descripcion_fco,imagen_fco,efectivo,delete_fco,created_fco,createdby_fco,updated_fco,updatedby_fco) FROM '" & Application.path & "/csv/formasdecobro.csv' delimiters ';';"
+   'TRY FPrincipal.bd1.DbConn.Exec(sql)
+   'sql = "COPY  " & mVarglobales.sPrefijo & "clientes(nombre_cl,cif,direccion,poblacion,provincia,cpostal,phone,phone2,fax,email,web,tpv,createdby_cl,updatedby_cl) FROM '" & Application.path & "/csv/clientes.csv' delimiters ';';"
+   'TRY FPrincipal.bd1.DbConn.Exec(sql)
+   'sql = "COPY  " & mVarglobales.sPrefijo & "familias(codigo,descripcion,garantia,lote,caducidad,anada,cbarras,ordenf,tpv,imagen,delete_f,created_f,createdby_f,updated_f,updatedby_f) FROM '" & Application.path & "/csv/Familias.csv' delimiters ';';" 
+   'TRY FPrincipal.bd1.DbConn.Exec(sql)
+   'sql = "COPY  " & mVarglobales.sPrefijo & "articulos(codigo_a, descripcion_a, idfamilia, idivaresta, pvresta, idivacompra, importepvfijo, pidepeso, peso, createdby_a, updatedby_a) FROM '" & Application.path & "/csv/articulos2.csv' delimiters ';';" 
+   'TRY FPrincipal.bd1.DbConn.Exec(sql)
+End
+
+
+Private Function meteysaca(linea As String) As String
+  Dim cadena As New String[]
+  Dim cadenita As String
+  Dim final As String
+  cadena = Split(linea, ";")
+
+  For Each cadenita In cadena
+    final &= "'" & cadenita & "',"
+  Next
+  Return Left$(final, -1)  'quitamos la última coma
+End
+
+
+Private Sub coge_error(Optional datos As String[])
+  Dim texto_error As String = error.Text
+  Dim donde_error As String = error.Where
+  Dim err As String
+  Dim Backtrace_error As String
+  For Each err In Error.Backtrace
+      Backtrace_error = Backtrace_error & "//" & err
+  Next
+  If datos <> Null Then
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error, datos)
+  Else
+    mFuncionesg.logea(texto_error, donde_error, Backtrace_error)
+  Endif
+End
+
+
+
+
+
+
+
+
+
