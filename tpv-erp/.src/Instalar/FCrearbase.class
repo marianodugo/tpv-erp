@@ -1,0 +1,199 @@
+' Gambas class file
+
+'/ * *
+'*
+'* @ package FCrearbase.class
+'* @ copyright 2009 2011 Luis Jorge Martin Aznar
+'* @ version 1.0
+'* @ review 1 
+'* @ author Luis Jorge Martin Aznar 
+'* @ e-mail ljma@telefonica.net
+'* creacion = 01/06/2010
+'* modificacion = 01/03/2011
+'*
+'* This file IS part OF TPV-ERP ©.
+'*
+'* This program IS free software: you can redistribute it AND / OR modify
+'* it under the terms OF the GNU General PUBLIC License AS published by
+'* the Free Software Foundation, either version 3 OF the License.
+'*
+'* This program IS distributed IN the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty OF
+'* MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.See the
+'* GNU General PUBLIC License FOR more details.
+'*
+'* You should have received a COPY OF the GNU General PUBLIC License
+'* along WITH this program.IfNOT, see < http: / / www.gnu.org / licenses / > .  
+'* /
+
+
+Public Sub Form_Open()
+    mFuncionesPantalla.dimensiona_pantalla(Me, "1", "1")
+    mFuncionesPantalla.centra_vertical(Me, Frame1, 5, 2, Me.Height / 1.6)
+    tux.left = Me.Width / 2 - tux.W / 2
+    Frame1.Text = mConstantes.bot_base
+    Label1.Text = mConstantes.bot_host
+    Label2.Text = mConstantes.bot_nombrebd
+    Label3.Text = mConstantes.bot_userbd
+    Label4.Text = mConstantes.bot_passbd
+    Label5.Text = mConstantes.bot_prefibd
+    Label6.Text = mConstantes.bot_crearbd
+    Label7.Text = mConstantes.bot_admin
+    Label8.Text = mConstantes.bot_passadmin
+    Label9.Text = mConstantes.bot_puerto
+    Label10.text = mConstantes.bot_idioma
+    Label11.Text = mConstantes.bot_nterminal
+    aceptar.Text = mConstantes.menu_aceptar
+    cancelar.Text = mConstantes.menu_salir
+    text.Text = mConstantes.bot_text
+    host.ToolTip = mConstantes.help_host
+    basedatos.ToolTip = mConstantes.help_nombrebd
+    usuario.ToolTip = mConstantes.help_userbd
+    passwordbd.ToolTip = mConstantes.help_passbd
+    prefijo.ToolTip = mConstantes.help_prefibd
+    user.ToolTip = mConstantes.help_admin
+    passworduser.ToolTip = mConstantes.help_passadmin
+    ComboBox1.ToolTip = mConstantes.help_idioma
+    ComboBox1.index = index_combo(combobox1, System.Language)
+    mFuncionesg.IniConfiguracion()
+    ProgressBar1.Width = Frame1.Width
+End
+
+
+Private Function index_combo(combo As ComboBox, idioma As String) As Integer
+  Dim i As Integer = 0
+  Dim sDatos As New String[]
+  Dim sDato As String
+  sDatos = combo.List
+  Select Case idioma
+    Case "en_GB.UTF-8" 
+      For Each sDato In sDatos
+        If sDato = "Inglés" Then
+            Return i
+        Endif
+        i += 1
+      Next
+    Case "es_ES.UTF-8"
+      For Each sDato In sDatos
+        If sDato = "Español" Then 
+            Return i
+        Endif
+        i += 1
+      Next
+  End Select
+End
+
+
+Private Function valor_combo(combo As ComboBox) As String
+  Select Case combo.Text
+    Case "Inglés" 
+        Return "en_GB.UTF-8"
+    Case "Español" 
+        Return "es_ES.UTF-8"
+  End Select
+End
+
+
+
+
+Public Sub texto_GotFocus()
+  Last.background = &9FFFFF&
+  aceptar.Enabled = False
+End
+Public Sub texto_lostFocus()
+  Last.background = &H5FFFAF&
+  aceptar.Enabled = False
+End
+
+Public Sub texto_KeyPress()
+  mFuncionesg.tabulador(Key.Code)
+End
+
+Public Sub cancelar_Click()
+  Me.Close
+End
+
+Public Sub aceptar_Click()
+    Dim valores As String[]
+    If Message.Question(mConstantes.inf_crearbase, mConstantes.menu_aceptar, mConstantes.menu_salir) = 1 Then
+          valores = New String[]
+           If compruebarrelleno() = True
+             valores.add(host.Text)  'host
+             valores.add(puerto.Text)  'puerto
+             valores.add(basedatos.Text)  'Base'
+             valores.add(usuario.Text)  'login'
+             valores.add(passwordbd.Text)  'password'
+             valores.add(prefijo.Text)  'prefijo tablas'
+             valores.add(user.Text)  'usuario TPV'
+             valores.add(passworduser.Text)  'password usuario TPV'
+
+             If mInstalar.cargartablas(valores, ProgressBar1) = True Then
+                 valores.add("YES")
+                 valores.add(valor_combo(ComboBox1)) 'idioma
+                 valores.add(terminal.Text)
+                 If mFuncionesEncriptar.crea_ini(valores, "TPV-ERP.ini") = False Then
+                   Message.Error(mConstantes.Error_ini)
+                 Endif
+                 Message.Info(mConstantes.inf_exitoinstalacion)
+                 Me.Close
+             Else
+                 Me.Close
+             Endif
+           Endif
+    Endif
+End
+
+
+Public Sub text_Click()
+   Dim C As CPostgres
+   Dim version As Boolean
+   Dim valores As String[]
+    valores = New String[]
+    valores.add(host.Text)  'host
+    valores.add(puerto.Text)  'puerto
+    valores.add(basedatos.Text)  'Base'
+    valores.add(usuario.Text)  'login'
+    valores.add(passwordbd.Text)  'password'
+    C = New CPostgres(valores)
+    version = C.test(valores)
+    C.DBclose
+    If version = True Then
+      If host.text <> "" And basedatos.text <> "" And usuario.text <> "" And passwordbd.text <> "" And prefijo.text <> "" And user.text <> "" And passworduser.text <> "" And puerto.text <> "" Then
+          If mFuncionesValidarCampos.validar_longuitud(passworduser, 5, ">") = True And mFuncionesValidarCampos.validar_numero(passworduser) = True And mFuncionesValidarCampos.validar_numero(terminal) = True Then
+             aceptar.Enabled = True
+          Else
+              aceptar.Enabled = False
+          Endif
+      Else
+          Message.Error(mConstantes.inf_camporeq)
+          aceptar.Enabled = False
+      Endif
+    Else
+      aceptar.Enabled = False
+    Endif
+End
+
+Public Sub Form_Close()
+   
+End
+
+Public Function compruebarrelleno() As Boolean
+    If host.text <> "" And basedatos.text <> "" And usuario.text <> "" And passwordbd.text <> "" And prefijo.text <> "" And user.text <> "" And passworduser.text <> "" And puerto.text <> "" Then
+     Return True
+    Else
+     Return False
+    Endif
+End
+
+
+Public Sub Label6_MouseDown()
+
+  
+
+End
+
+Public Sub Frame1_MouseDown()
+
+  
+
+End
