@@ -1,0 +1,1 @@
+Solución comercial y de Punto de Venta, con la que podrás gestionar las operaciones comerciales de tu negocio.
